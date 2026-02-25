@@ -1,6 +1,7 @@
 import type { AgUiEvent, ToolCall } from '$types/index';
 import { createSession, cancelSession } from '$services/api';
 import { connectSession } from '$services/sse';
+import { toastStore } from './toasts.svelte';
 
 export class TabSession {
 	status = $state<'idle' | 'running' | 'completed' | 'error'>('idle');
@@ -22,7 +23,7 @@ export class TabSession {
 	fullOutput = $derived(this.outputChunks.join(''));
 	totalTokens = $derived((this.inputTokens ?? 0) + (this.outputTokens ?? 0));
 
-	async start(workspaceId: string, prompt: string, skill?: string, agent?: string) {
+	async start(workspaceId: string, prompt: string, skill?: string, agent?: string, model?: string) {
 		this.reset();
 		this.status = 'running';
 
@@ -31,7 +32,8 @@ export class TabSession {
 				workspace_id: workspaceId,
 				prompt,
 				skill,
-				agent
+				agent,
+				model
 			});
 			this.sessionId = session_id;
 
@@ -121,12 +123,14 @@ export class TabSession {
 				this.durationMs = event.duration_ms ?? null;
 				if (event.model) this.model = event.model;
 				this.disconnect();
+				this._notifyIfBackground('completed');
 				break;
 
 			case 'RunError':
 				this.status = 'error';
 				this.errorMsg = event.error ?? 'Unknown error';
 				this.disconnect();
+				this._notifyIfBackground('error');
 				break;
 		}
 	}
@@ -159,6 +163,17 @@ export class TabSession {
 		this.numTurns = null;
 		this.durationMs = null;
 		this.errorMsg = null;
+	}
+
+	private _notifyIfBackground(result: 'completed' | 'error') {
+		const tab = tabsStore.tabs.find((t) => t.session === this);
+		if (!tab || tab.id === tabsStore.activeTabId) return;
+		const label = tab.label.length > 25 ? tab.label.slice(0, 25) + '...' : tab.label;
+		if (result === 'completed') {
+			toastStore.add(`"${label}" finished`, 'success');
+		} else {
+			toastStore.add(`"${label}" failed`, 'error');
+		}
 	}
 
 	private disconnect() {

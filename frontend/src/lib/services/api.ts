@@ -5,7 +5,12 @@ import type {
 	SessionHistoryItem,
 	SessionEvent,
 	Session,
-	RuleFile
+	RuleFile,
+	AnalyticsSummary,
+	CostByWorkspace,
+	CostTrendPoint,
+	TopSkillItem,
+	TokenEfficiency
 } from '$types/index';
 
 const BASE = '/api';
@@ -133,4 +138,26 @@ export async function fetchSettings(
 	workspaceId: string
 ): Promise<{ content: Record<string, unknown> | null; exists: boolean }> {
 	return request(`/config/${workspaceId}/settings`);
+}
+
+// --- Analytics ---
+
+export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
+	return request('/analytics/summary');
+}
+
+export async function fetchCostByWorkspace(): Promise<CostByWorkspace[]> {
+	return request('/analytics/cost-by-workspace');
+}
+
+export async function fetchCostTrend(days: number = 30): Promise<CostTrendPoint[]> {
+	return request(`/analytics/cost-trend?days=${days}`);
+}
+
+export async function fetchTopSkills(limit: number = 10): Promise<TopSkillItem[]> {
+	return request(`/analytics/top-skills?limit=${limit}`);
+}
+
+export async function fetchTokenEfficiency(): Promise<TokenEfficiency> {
+	return request('/analytics/token-efficiency');
 }

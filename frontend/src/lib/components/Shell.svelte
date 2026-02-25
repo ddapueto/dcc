@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PanelLeft, Terminal, History, FileCode, Settings } from '@lucide/svelte';
+	import { PanelLeft, Terminal, History, FileCode, Settings, LayoutDashboard } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import type { Snippet } from 'svelte';
 
@@ -18,6 +18,7 @@
 	let sidebarOpen = $state(true);
 
 	const navItems = [
+		{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
 		{ href: '/run', label: 'Run', icon: Terminal },
 		{ href: '/history', label: 'History', icon: History },
 		{ href: '/config', label: 'Config', icon: FileCode },

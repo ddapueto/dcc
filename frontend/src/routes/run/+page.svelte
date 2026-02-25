@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import Shell from '$lib/components/Shell.svelte';
 	import WorkspacePicker from '$lib/components/WorkspacePicker.svelte';
 	import SkillPicker from '$lib/components/SkillPicker.svelte';
@@ -10,14 +10,21 @@
 	import TabBar from '$lib/components/TabBar.svelte';
 	import { workspacesStore } from '$stores/workspaces.svelte';
 	import { tabsStore } from '$stores/tabs.svelte';
+	import { initGlobalShortcuts } from '$lib/actions/shortcuts';
 	import type { SkillInfo, AgentInfo } from '$types/index';
 
 	let selectedSkill = $state<string | null>(null);
 	let selectedAgent = $state<string | null>(null);
+	let cleanupShortcuts: (() => void) | undefined;
 
 	onMount(() => {
 		workspacesStore.fetch();
 		tabsStore.ensureTab();
+		cleanupShortcuts = initGlobalShortcuts();
+	});
+
+	onDestroy(() => {
+		cleanupShortcuts?.();
 	});
 
 	function handleSelectSkill(skill: SkillInfo) {
@@ -30,7 +37,7 @@
 		selectedSkill = null;
 	}
 
-	function handleSubmit(prompt: string) {
+	function handleSubmit(prompt: string, model?: string) {
 		if (!workspacesStore.currentWorkspaceId) return;
 		const session = tabsStore.activeSession;
 		if (!session) return;
@@ -45,7 +52,8 @@
 			workspacesStore.currentWorkspaceId,
 			prompt,
 			selectedSkill ?? undefined,
-			selectedAgent ?? undefined
+			selectedAgent ?? undefined,
+			model
 		);
 	}
 

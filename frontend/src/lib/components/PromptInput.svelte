@@ -1,5 +1,15 @@
 <script lang="ts">
-	import { Send, Square, Loader2 } from '@lucide/svelte';
+	import { Send, Square } from '@lucide/svelte';
+
+	const MODELS = [
+		{ id: 'default', label: 'Default', value: undefined },
+		{ id: 'opus', label: 'Opus', value: 'claude-opus-4-20250514' },
+		{ id: 'sonnet', label: 'Sonnet', value: 'claude-sonnet-4-20250514' },
+		{ id: 'haiku', label: 'Haiku', value: 'claude-haiku-4-20250514' }
+	] as const;
+
+	const HISTORY_KEY = 'dcc:prompt-history';
+	const HISTORY_MAX = 50;
 
 	let {
 		running = false,
@@ -13,22 +23,69 @@
 		disabled?: boolean;
 		selectedSkill?: string | null;
 		selectedAgent?: string | null;
-		onSubmit?: (prompt: string) => void;
+		onSubmit?: (prompt: string, model?: string) => void;
 		onCancel?: () => void;
 	} = $props();
 
 	let prompt = $state('');
+	let selectedModelId = $state<string>('default');
+
+	// Prompt history
+	let historyIndex = $state(-1);
+	let savedPrompt = $state('');
+
+	function getHistory(): string[] {
+		try {
+			return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]');
+		} catch {
+			return [];
+		}
+	}
+
+	function saveToHistory(text: string) {
+		const history = getHistory();
+		if (history[0] === text) return;
+		history.unshift(text);
+		if (history.length > HISTORY_MAX) history.length = HISTORY_MAX;
+		localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+	}
+
+	const selectedModel = $derived(MODELS.find((m) => m.id === selectedModelId)!);
 
 	function handleSubmit() {
 		const text = prompt.trim();
 		if (!text || disabled) return;
-		onSubmit?.(text);
+		saveToHistory(text);
+		historyIndex = -1;
+		onSubmit?.(text, selectedModel.value);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
 			e.preventDefault();
 			handleSubmit();
+			return;
+		}
+
+		if (e.key === 'ArrowUp' && prompt === '' || (e.key === 'ArrowUp' && historyIndex >= 0)) {
+			e.preventDefault();
+			const history = getHistory();
+			if (history.length === 0) return;
+			if (historyIndex === -1) savedPrompt = prompt;
+			const next = Math.min(historyIndex + 1, history.length - 1);
+			historyIndex = next;
+			prompt = history[next];
+			return;
+		}
+
+		if (e.key === 'ArrowDown' && historyIndex >= 0) {
+			e.preventDefault();
+			historyIndex -= 1;
+			if (historyIndex < 0) {
+				prompt = savedPrompt;
+			} else {
+				prompt = getHistory()[historyIndex];
+			}
 		}
 	}
 </script>
@@ -49,6 +106,21 @@
 			{/if}
 		</div>
 	{/if}
+
+	<!-- Model selector pills -->
+	<div class="mb-2 flex items-center gap-1.5">
+		<span class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mr-1">Model</span>
+		{#each MODELS as model}
+			<button
+				onclick={() => (selectedModelId = model.id)}
+				class="rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors {selectedModelId === model.id
+					? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] ring-1 ring-[var(--color-accent)]/30'
+					: 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-card)] hover:text-[var(--color-text-secondary)]'}"
+			>
+				{model.label}
+			</button>
+		{/each}
+	</div>
 
 	<!-- Input area -->
 	<div class="flex gap-2">
@@ -83,7 +155,8 @@
 		{/if}
 	</div>
 
-	<div class="mt-1 text-right text-[10px] text-[var(--color-text-muted)]">
-		{running ? 'Running...' : 'Cmd+Enter to run'}
+	<div class="mt-1 flex items-center justify-between text-[10px] text-[var(--color-text-muted)]">
+		<span>⌘K new tab · ⌘W close · Esc cancel</span>
+		<span>{running ? 'Running...' : 'Cmd+Enter to run'}</span>
 	</div>
 </div>

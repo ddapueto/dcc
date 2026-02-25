@@ -133,3 +133,47 @@ export interface RuleFile {
 	filename: string;
 	content: string;
 }
+
+// --- Analytics ---
+
+export interface AnalyticsSummary {
+	total_sessions: number;
+	total_cost: number;
+	total_input_tokens: number;
+	total_output_tokens: number;
+	cost_7d: number;
+	sessions_7d: number;
+	cost_24h: number;
+	sessions_24h: number;
+	by_status: Record<string, number>;
+}
+
+export interface CostByWorkspace {
+	workspace_name: string;
+	tenant_name: string;
+	session_count: number;
+	total_cost: number;
+	total_input_tokens: number;
+	total_output_tokens: number;
+}
+
+export interface CostTrendPoint {
+	date: string;
+	sessions: number;
+	cost: number;
+}
+
+export interface TopSkillItem {
+	name: string;
+	kind: 'skill' | 'agent' | 'prompt';
+	count: number;
+	total_cost: number;
+}
+
+export interface TokenEfficiency {
+	total_input: number;
+	total_output: number;
+	cache_read: number;
+	cache_write: number;
+	cache_hit_ratio: number;
+}

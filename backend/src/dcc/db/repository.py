@@ -265,3 +265,129 @@ async def delete_tenant(tenant_id: str) -> bool:
     cursor = await db.execute("DELETE FROM tenants WHERE id = ?", (tenant_id,))
     await db.commit()
     return cursor.rowcount > 0
+
+
+# --- Analytics ---
+
+
+async def get_analytics_summary() -> dict:
+    db = await get_db()
+
+    cursor = await db.execute(
+        """SELECT
+             COUNT(*) as total_sessions,
+             COALESCE(SUM(cost_usd), 0) as total_cost,
+             COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+             COALESCE(SUM(output_tokens), 0) as total_output_tokens
+           FROM sessions"""
+    )
+    totals = dict(await cursor.fetchone())
+
+    cursor = await db.execute(
+        """SELECT COALESCE(SUM(cost_usd), 0) as cost_7d, COUNT(*) as sessions_7d
+           FROM sessions
+           WHERE started_at >= datetime('now', '-7 days')"""
+    )
+    week = dict(await cursor.fetchone())
+
+    cursor = await db.execute(
+        """SELECT COALESCE(SUM(cost_usd), 0) as cost_24h, COUNT(*) as sessions_24h
+           FROM sessions
+           WHERE started_at >= datetime('now', '-1 day')"""
+    )
+    day = dict(await cursor.fetchone())
+
+    cursor = await db.execute(
+        """SELECT status, COUNT(*) as count
+           FROM sessions GROUP BY status"""
+    )
+    by_status = {row["status"]: row["count"] for row in await cursor.fetchall()}
+
+    return {**totals, **week, **day, "by_status": by_status}
+
+
+async def get_cost_by_workspace() -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT w.name as workspace_name, t.name as tenant_name,
+                  COUNT(*) as session_count,
+                  COALESCE(SUM(s.cost_usd), 0) as total_cost,
+                  COALESCE(SUM(s.input_tokens), 0) as total_input_tokens,
+                  COALESCE(SUM(s.output_tokens), 0) as total_output_tokens
+           FROM sessions s
+           JOIN workspaces w ON s.workspace_id = w.id
+           JOIN tenants t ON w.tenant_id = t.id
+           GROUP BY s.workspace_id
+           ORDER BY total_cost DESC"""
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_cost_trend(days: int = 30) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT DATE(started_at) as date,
+                  COUNT(*) as sessions,
+                  COALESCE(SUM(cost_usd), 0) as cost
+           FROM sessions
+           WHERE started_at >= datetime('now', ? || ' days')
+           GROUP BY DATE(started_at)
+           ORDER BY date""",
+        (f"-{days}",),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_top_skills(limit: int = 10) -> list[dict]:
+    db = await get_db()
+    # Combine skills and agents into one ranking
+    cursor = await db.execute(
+        """SELECT
+             CASE
+               WHEN skill IS NOT NULL THEN '/' || skill
+               WHEN agent IS NOT NULL THEN '@' || agent
+               ELSE '(prompt)'
+             END as name,
+             CASE
+               WHEN skill IS NOT NULL THEN 'skill'
+               WHEN agent IS NOT NULL THEN 'agent'
+               ELSE 'prompt'
+             END as kind,
+             COUNT(*) as count,
+             COALESCE(SUM(cost_usd), 0) as total_cost
+           FROM sessions
+           GROUP BY name, kind
+           ORDER BY count DESC
+           LIMIT ?""",
+        (limit,),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_token_efficiency() -> dict:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT
+             COALESCE(SUM(input_tokens), 0) as total_input,
+             COALESCE(SUM(output_tokens), 0) as total_output
+           FROM sessions"""
+    )
+    session_totals = dict(await cursor.fetchone())
+
+    cursor = await db.execute(
+        """SELECT
+             COALESCE(SUM(cache_read_tokens), 0) as cache_read,
+             COALESCE(SUM(cache_write_tokens), 0) as cache_write
+           FROM token_usage"""
+    )
+    cache_totals = dict(await cursor.fetchone())
+
+    total_input = session_totals["total_input"]
+    cache_read = cache_totals["cache_read"]
+    cache_hit_ratio = (cache_read / total_input) if total_input > 0 else 0
+
+    return {
+        **session_totals,
+        **cache_totals,
+        "cache_hit_ratio": round(cache_hit_ratio, 4),
+    }
