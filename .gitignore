@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+
+# Build
+frontend/build/
+frontend/.svelte-kit/
+backend/dist/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Environment
+.env
+backend/.env
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Cache
+.pytest_cache/
+.ruff_cache/
