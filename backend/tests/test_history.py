@@ -163,3 +163,32 @@ async def test_search_combined_filters():
     )
     assert total == 1
     assert sessions[0]["id"] == s1
+
+
+# --- Session Diffs ---
+
+
+@pytest.mark.asyncio
+async def test_insert_and_get_session_diff():
+    sid = await repository.create_session("w1", "diff test")
+    await repository.insert_session_diff(
+        session_id=sid,
+        diff_stat="3 files changed, 42 insertions(+), 5 deletions(-)",
+        diff_content="diff --git a/foo.py b/foo.py\n+new line",
+        files_changed=3,
+        insertions=42,
+        deletions=5,
+    )
+    diff = await repository.get_session_diff(sid)
+    assert diff is not None
+    assert diff["files_changed"] == 3
+    assert diff["insertions"] == 42
+    assert diff["deletions"] == 5
+    assert "foo.py" in diff["diff_content"]
+
+
+@pytest.mark.asyncio
+async def test_get_session_diff_not_found():
+    sid = await repository.create_session("w1", "no diff")
+    diff = await repository.get_session_diff(sid)
+    assert diff is None

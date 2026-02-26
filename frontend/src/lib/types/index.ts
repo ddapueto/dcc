@@ -16,6 +16,8 @@ export interface Workspace {
 	agents_count: number;
 	skills_count: number;
 	has_claude_md: boolean;
+	repo_owner: string | null;
+	repo_name: string | null;
 	last_scanned_at: string | null;
 }
 
@@ -39,6 +41,8 @@ export interface WorkspaceDetail {
 	name: string;
 	path: string;
 	has_claude_md: boolean;
+	repo_owner: string | null;
+	repo_name: string | null;
 	agents: AgentInfo[];
 	skills: SkillInfo[];
 }
@@ -176,4 +180,59 @@ export interface TokenEfficiency {
 	cache_read: number;
 	cache_write: number;
 	cache_hit_ratio: number;
+}
+
+// --- GitHub ---
+
+export interface GitHubMilestone {
+	number: number;
+	title: string;
+	description: string | null;
+	state: string;
+	open_issues: number;
+	closed_issues: number;
+	due_on: string | null;
+}
+
+export interface GitHubIssue {
+	number: number;
+	title: string;
+	body: string | null;
+	state: string;
+	labels: { name: string; color: string }[];
+	assignees: { login: string }[];
+	milestone?: { number: number };
+	created_at: string;
+	html_url: string;
+}
+
+export interface GitHubPR {
+	number: number;
+	title: string;
+	state: string;
+	head: { ref: string };
+	base: { ref: string };
+	draft: boolean;
+	user: { login: string };
+	html_url: string;
+	created_at: string;
+}
+
+// --- Diff ---
+
+export interface SessionDiff {
+	diff_stat: string | null;
+	diff_content: string | null;
+	files_changed: number;
+	insertions: number;
+	deletions: number;
+}
+
+// --- MCP ---
+
+export interface McpServer {
+	name: string;
+	command: string;
+	args: string[];
+	source: 'workspace' | 'global';
 }

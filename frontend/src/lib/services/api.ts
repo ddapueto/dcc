@@ -10,7 +10,12 @@ import type {
 	CostByWorkspace,
 	CostTrendPoint,
 	TopSkillItem,
-	TokenEfficiency
+	TokenEfficiency,
+	GitHubMilestone,
+	GitHubIssue,
+	GitHubPR,
+	SessionDiff,
+	McpServer
 } from '$types/index';
 
 const BASE = '/api';
@@ -160,4 +165,69 @@ export async function fetchTopSkills(limit: number = 10): Promise<TopSkillItem[]
 
 export async function fetchTokenEfficiency(): Promise<TokenEfficiency> {
 	return request('/analytics/token-efficiency');
+}
+
+// --- GitHub ---
+
+export async function fetchMilestones(
+	workspaceId: string,
+	state: string = 'open'
+): Promise<{ milestones: GitHubMilestone[] }> {
+	return request(`/github/milestones?workspace_id=${workspaceId}&state=${state}`);
+}
+
+export async function fetchMilestoneIssues(
+	workspaceId: string,
+	number: number
+): Promise<{ issues: GitHubIssue[] }> {
+	return request(`/github/milestones/${number}/issues?workspace_id=${workspaceId}`);
+}
+
+export async function fetchGitHubIssues(
+	workspaceId: string,
+	state: string = 'open'
+): Promise<{ issues: GitHubIssue[] }> {
+	return request(`/github/issues?workspace_id=${workspaceId}&state=${state}`);
+}
+
+export async function fetchGitHubIssue(
+	workspaceId: string,
+	number: number
+): Promise<GitHubIssue> {
+	return request(`/github/issues/${number}?workspace_id=${workspaceId}`);
+}
+
+export async function fetchGitHubPRs(
+	workspaceId: string,
+	state: string = 'open'
+): Promise<{ pulls: GitHubPR[] }> {
+	return request(`/github/pulls?workspace_id=${workspaceId}&state=${state}`);
+}
+
+export async function createGitHubIssue(params: {
+	workspace_id: string;
+	title: string;
+	body?: string;
+	labels?: string[];
+}): Promise<GitHubIssue> {
+	return request('/github/issues', {
+		method: 'POST',
+		body: JSON.stringify(params)
+	});
+}
+
+// --- Session Diff ---
+
+export async function fetchSessionDiff(
+	sessionId: string
+): Promise<{ has_diff: boolean; diff: SessionDiff | null }> {
+	return request(`/sessions/${sessionId}/diff`);
+}
+
+// --- MCP ---
+
+export async function fetchMcps(
+	workspaceId: string
+): Promise<{ servers: McpServer[] }> {
+	return request(`/config/${workspaceId}/mcps`);
 }

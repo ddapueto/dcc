@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from dcc.db import repository
+from dcc.workspace.scanner import detect_git_repo
 
 HOME = Path.home()
 
@@ -132,4 +133,8 @@ async def seed_defaults():
         await repository.upsert_tenant(t["id"], t["name"], t["config_dir"], t["claude_alias"])
 
     for w in WORKSPACES:
-        await repository.upsert_workspace(w["id"], w["tenant_id"], w["name"], w["path"])
+        owner, repo = detect_git_repo(w["path"])
+        await repository.upsert_workspace(
+            w["id"], w["tenant_id"], w["name"], w["path"],
+            repo_owner=owner, repo_name=repo,
+        )

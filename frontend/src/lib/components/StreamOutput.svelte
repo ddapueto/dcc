@@ -1,9 +1,16 @@
 <script lang="ts">
-	import { MessageSquare, AlertCircle } from '@lucide/svelte';
+	import { MessageSquare, AlertCircle, Copy } from '@lucide/svelte';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import DiffViewer from './DiffViewer.svelte';
 	import type { TabSession } from '$stores/tabs.svelte';
 
-	let { session }: { session: TabSession } = $props();
+	let {
+		session,
+		onUseAsContext
+	}: {
+		session: TabSession;
+		onUseAsContext?: (output: string) => void;
+	} = $props();
 
 	let outputEl: HTMLDivElement | undefined = $state();
 
@@ -38,6 +45,21 @@
 			<div class="flex items-center gap-2 border-t border-[var(--color-error)]/20 bg-[var(--color-error)]/5 px-4 py-2">
 				<AlertCircle class="h-4 w-4 shrink-0 text-[var(--color-error)]" />
 				<span class="text-xs text-[var(--color-error)]">{session.errorMsg}</span>
+			</div>
+		{/if}
+
+		{#if session.status === 'completed' && session.sessionId}
+			<div class="border-t border-[var(--color-border)] p-4">
+				<DiffViewer sessionId={session.sessionId} collapsed={true} />
+				{#if onUseAsContext && session.fullOutput}
+					<button
+						class="mt-2 flex items-center gap-1.5 rounded-lg bg-[var(--color-bg-card)] px-3 py-1.5 text-xs text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-accent)]"
+						onclick={() => onUseAsContext(session.fullOutput)}
+					>
+						<Copy class="h-3 w-3" />
+						Use as context
+					</button>
+				{/if}
 			</div>
 		{/if}
 	{/if}

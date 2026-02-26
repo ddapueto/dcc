@@ -54,12 +54,107 @@ def has_claude_md(workspace_path: str) -> bool:
     return (Path(workspace_path) / "CLAUDE.md").is_file()
 
 
-def scan_workspace(workspace_path: str) -> tuple[list[AgentInfo], list[SkillInfo], bool]:
-    """Full scan of a workspace. Returns (agents, skills, has_claude_md)."""
+def detect_git_repo(workspace_path: str) -> tuple[str | None, str | None]:
+    """Detect GitHub owner/repo from .git/config remote origin URL.
+
+    Supports: git@github.com:owner/repo.git, https://github.com/owner/repo[.git]
+    Returns (owner, repo_name) or (None, None).
+    """
+    git_config = Path(workspace_path) / ".git" / "config"
+    if not git_config.is_file():
+        return None, None
+
+    try:
+        content = git_config.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None, None
+
+    # Look for remote "origin" url
+    for line in content.splitlines():
+        line = line.strip()
+        if not line.startswith("url ="):
+            continue
+        url = line.split("=", 1)[1].strip()
+
+        # SSH: git@github.com:owner/repo.git
+        ssh_match = re.match(r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$", url)
+        if ssh_match:
+            return ssh_match.group(1), ssh_match.group(2)
+
+        # HTTPS: https://github.com/owner/repo[.git]
+        https_match = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?$", url)
+        if https_match:
+            return https_match.group(1), https_match.group(2)
+
+    return None, None
+
+
+def read_mcp_json(workspace_path: str) -> dict | None:
+    """Read and parse .mcp.json from workspace root."""
+    import json
+
+    path = Path(workspace_path) / ".mcp.json"
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def get_mcp_servers(workspace_path: str, config_dir: str | None = None) -> list[dict]:
+    """Get combined MCP servers from .mcp.json + config_dir settings.local.json.
+
+    Returns list of { name, command, args, env, source }.
+    """
+    import json
+
+    servers: list[dict] = []
+
+    # Workspace-level .mcp.json
+    mcp_data = read_mcp_json(workspace_path)
+    if mcp_data and isinstance(mcp_data.get("mcpServers"), dict):
+        for name, cfg in mcp_data["mcpServers"].items():
+            servers.append({
+                "name": name,
+                "command": cfg.get("command", ""),
+                "args": cfg.get("args", []),
+                "source": "workspace",
+            })
+
+    # Global settings.local.json from config_dir
+    if config_dir:
+        settings_path = Path(config_dir) / "settings.local.json"
+        if settings_path.is_file():
+            try:
+                data = json.loads(settings_path.read_text(encoding="utf-8", errors="replace"))
+                if isinstance(data.get("mcpServers"), dict):
+                    for name, cfg in data["mcpServers"].items():
+                        # Avoid duplicates — workspace overrides global
+                        if not any(s["name"] == name for s in servers):
+                            servers.append({
+                                "name": name,
+                                "command": cfg.get("command", ""),
+                                "args": cfg.get("args", []),
+                                "source": "global",
+                            })
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    return servers
+
+
+def scan_workspace(
+    workspace_path: str,
+) -> tuple[list[AgentInfo], list[SkillInfo], bool, str | None, str | None]:
+    """Full scan of a workspace. Returns (agents, skills, has_claude_md, repo_owner, repo_name)."""
+    owner, repo = detect_git_repo(workspace_path)
     return (
         scan_agents(workspace_path),
         scan_skills(workspace_path),
         has_claude_md(workspace_path),
+        owner,
+        repo,
     )
 
 

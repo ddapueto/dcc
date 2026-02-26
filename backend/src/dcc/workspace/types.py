@@ -21,5 +21,14 @@ class WorkspaceDetail(BaseModel):
     name: str
     path: str
     has_claude_md: bool
+    repo_owner: str | None = None
+    repo_name: str | None = None
     agents: list[AgentInfo]
     skills: list[SkillInfo]
+
+
+class McpServerInfo(BaseModel):
+    name: str
+    command: str
+    args: list[str] = []
+    source: str  # "workspace" | "global"

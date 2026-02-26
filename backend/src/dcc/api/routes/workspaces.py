@@ -38,7 +38,7 @@ async def create_workspace(req: CreateWorkspaceRequest):
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     workspace_id = str(uuid.uuid4())
-    agents, skills, has_md = scan_workspace(req.path)
+    agents, skills, has_md, owner, repo = scan_workspace(req.path)
     await repository.upsert_workspace(
         workspace_id=workspace_id,
         tenant_id=req.tenant_id,
@@ -47,6 +47,8 @@ async def create_workspace(req: CreateWorkspaceRequest):
         agents_count=len(agents),
         skills_count=len(skills),
         has_claude_md=has_md,
+        repo_owner=owner,
+        repo_name=repo,
     )
     return {"id": workspace_id}
 
@@ -58,7 +60,7 @@ async def get_workspace(workspace_id: str):
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    agents, skills, has_md = scan_workspace(ws["path"])
+    agents, skills, has_md, owner, repo = scan_workspace(ws["path"])
 
     return WorkspaceDetail(
         id=ws["id"],
@@ -67,6 +69,8 @@ async def get_workspace(workspace_id: str):
         name=ws["name"],
         path=ws["path"],
         has_claude_md=has_md,
+        repo_owner=owner or ws.get("repo_owner"),
+        repo_name=repo or ws.get("repo_name"),
         agents=agents,
         skills=skills,
     )
@@ -111,9 +115,10 @@ async def scan_all_workspaces():
 
     for ws in workspaces:
         try:
-            agents, skills, has_md = scan_workspace(ws["path"])
+            agents, skills, has_md, owner, repo = scan_workspace(ws["path"])
             await repository.update_workspace_scan(
-                ws["id"], len(agents), len(skills), has_md
+                ws["id"], len(agents), len(skills), has_md,
+                repo_owner=owner, repo_name=repo,
             )
             results.append({
                 "id": ws["id"],
@@ -121,6 +126,8 @@ async def scan_all_workspaces():
                 "agents_count": len(agents),
                 "skills_count": len(skills),
                 "has_claude_md": has_md,
+                "repo_owner": owner,
+                "repo_name": repo,
             })
         except Exception as e:
             results.append({

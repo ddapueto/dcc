@@ -91,10 +91,12 @@ def test_scan_workspace_full():
             commands={"skill-1.md": "Skill 1 description."},
             create_claude_md=True,
         )
-        agents, skills, has_md = scan_workspace(tmp)
+        agents, skills, has_md, owner, repo = scan_workspace(tmp)
         assert len(agents) == 1
         assert len(skills) == 1
         assert has_md is True
+        assert owner is None  # tmp dir has no .git
+        assert repo is None
 
 
 def test_scan_nonexistent_dir():

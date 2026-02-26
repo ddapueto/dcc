@@ -64,14 +64,17 @@ async def upsert_workspace(
     agents_count: int = 0,
     skills_count: int = 0,
     has_claude_md: bool = False,
+    repo_owner: str | None = None,
+    repo_name: str | None = None,
 ) -> None:
     db = await get_db()
     await db.execute(
         """INSERT INTO workspaces
-             (id, tenant_id, name, path, agents_count, skills_count, has_claude_md)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+             (id, tenant_id, name, path, agents_count, skills_count, has_claude_md, repo_owner, repo_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              name=?, agents_count=?, skills_count=?, has_claude_md=?,
+             repo_owner=?, repo_name=?,
              last_scanned_at=datetime('now')""",
         (
             workspace_id,
@@ -81,24 +84,35 @@ async def upsert_workspace(
             agents_count,
             skills_count,
             int(has_claude_md),
+            repo_owner,
+            repo_name,
             name,
             agents_count,
             skills_count,
             int(has_claude_md),
+            repo_owner,
+            repo_name,
         ),
     )
     await db.commit()
 
 
 async def update_workspace_scan(
-    workspace_id: str, agents_count: int, skills_count: int, has_claude_md: bool
+    workspace_id: str,
+    agents_count: int,
+    skills_count: int,
+    has_claude_md: bool,
+    repo_owner: str | None = None,
+    repo_name: str | None = None,
 ) -> None:
     db = await get_db()
     await db.execute(
         """UPDATE workspaces
-           SET agents_count=?, skills_count=?, has_claude_md=?, last_scanned_at=datetime('now')
+           SET agents_count=?, skills_count=?, has_claude_md=?,
+               repo_owner=?, repo_name=?,
+               last_scanned_at=datetime('now')
            WHERE id=?""",
-        (agents_count, skills_count, int(has_claude_md), workspace_id),
+        (agents_count, skills_count, int(has_claude_md), repo_owner, repo_name, workspace_id),
     )
     await db.commit()
 
@@ -248,6 +262,36 @@ async def get_sessions_with_search(
     cursor = await db.execute(select, [*params, limit, offset])
     rows = await cursor.fetchall()
     return [dict(r) for r in rows], total
+
+
+# --- Session Diffs ---
+
+
+async def insert_session_diff(
+    session_id: str,
+    diff_stat: str | None,
+    diff_content: str | None,
+    files_changed: int = 0,
+    insertions: int = 0,
+    deletions: int = 0,
+) -> None:
+    db = await get_db()
+    await db.execute(
+        """INSERT OR REPLACE INTO session_diffs
+             (session_id, diff_stat, diff_content, files_changed, insertions, deletions)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (session_id, diff_stat, diff_content, files_changed, insertions, deletions),
+    )
+    await db.commit()
+
+
+async def get_session_diff(session_id: str) -> dict | None:
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM session_diffs WHERE session_id = ?", (session_id,)
+    )
+    row = await cursor.fetchone()
+    return dict(row) if row else None
 
 
 # --- Delete ---

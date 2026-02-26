@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { ChevronDown, ChevronRight } from '@lucide/svelte';
-	import { fetchClaudeMd, fetchRules, fetchSettings } from '$services/api';
-	import type { RuleFile } from '$types/index';
+	import { fetchClaudeMd, fetchRules, fetchSettings, fetchMcps } from '$services/api';
+	import type { RuleFile, McpServer } from '$types/index';
 
 	let { workspaceId }: { workspaceId: string } = $props();
 
-	let tab = $state<'claude-md' | 'rules' | 'settings'>('claude-md');
+	let tab = $state<'claude-md' | 'rules' | 'settings' | 'mcps'>('claude-md');
 	let loading = $state(false);
 
 	// claude-md
@@ -19,6 +19,9 @@
 	// settings
 	let settingsContent = $state<Record<string, unknown> | null>(null);
 	let settingsExists = $state(false);
+
+	// mcps
+	let mcps = $state<McpServer[]>([]);
 
 	$effect(() => {
 		loadTab(workspaceId, tab);
@@ -38,6 +41,9 @@
 				const data = await fetchSettings(wsId);
 				settingsContent = data.content;
 				settingsExists = data.exists;
+			} else if (currentTab === 'mcps') {
+				const data = await fetchMcps(wsId);
+				mcps = data.servers;
 			}
 		} catch {
 			// silenciar — UI muestra estado vacío
@@ -76,6 +82,15 @@
 			onclick={() => (tab = 'settings')}
 		>
 			Settings
+		</button>
+		<button
+			class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors
+			{tab === 'mcps'
+				? 'bg-[var(--color-bg-card)] text-[var(--color-accent)]'
+				: 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'}"
+			onclick={() => (tab = 'mcps')}
+		>
+			MCPs ({mcps.length})
 		</button>
 	</div>
 
@@ -130,6 +145,30 @@
 			{:else}
 				<div class="py-8 text-center text-sm text-[var(--color-text-muted)]">
 					No settings.json found
+				</div>
+			{/if}
+		{:else if tab === 'mcps'}
+			{#if mcps.length > 0}
+				<div class="flex flex-col gap-2">
+					{#each mcps as server (server.name)}
+						<div class="glass rounded-lg px-4 py-3">
+							<div class="flex items-center gap-2">
+								<span class="text-xs font-medium text-[var(--color-text-primary)]">{server.name}</span>
+								<span class="rounded-full px-1.5 py-0.5 text-[9px] font-medium {server.source === 'workspace'
+									? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+									: 'bg-[var(--color-info)]/10 text-[var(--color-info)]'}">
+									{server.source}
+								</span>
+							</div>
+							<div class="mt-1 font-mono text-[11px] text-[var(--color-text-muted)]">
+								{server.command} {server.args.join(' ')}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<div class="py-8 text-center text-sm text-[var(--color-text-muted)]">
+					No MCP servers configured
 				</div>
 			{/if}
 		{/if}

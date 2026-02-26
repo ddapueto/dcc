@@ -16,6 +16,7 @@
 		disabled = false,
 		selectedSkill = null,
 		selectedAgent = null,
+		prefill = null,
 		onSubmit,
 		onCancel
 	}: {
@@ -23,12 +24,20 @@
 		disabled?: boolean;
 		selectedSkill?: string | null;
 		selectedAgent?: string | null;
+		prefill?: string | null;
 		onSubmit?: (prompt: string, model?: string) => void;
 		onCancel?: () => void;
 	} = $props();
 
 	let prompt = $state('');
 	let selectedModelId = $state<string>('default');
+
+	// Prefill from external source (e.g., GitHub issue, context sharing)
+	$effect(() => {
+		if (prefill) {
+			prompt = prefill;
+		}
+	});
 
 	// Prompt history
 	let historyIndex = $state(-1);

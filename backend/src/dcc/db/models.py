@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
     agents_count INTEGER NOT NULL DEFAULT 0,
     skills_count INTEGER NOT NULL DEFAULT 0,
     has_claude_md INTEGER NOT NULL DEFAULT 0,
+    repo_owner TEXT,
+    repo_name TEXT,
     last_scanned_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -58,4 +60,16 @@ CREATE TABLE IF NOT EXISTS session_events (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_session_events_session ON session_events(session_id);
+
+CREATE TABLE IF NOT EXISTS session_diffs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE REFERENCES sessions(id),
+    diff_stat TEXT,
+    diff_content TEXT,
+    files_changed INTEGER DEFAULT 0,
+    insertions INTEGER DEFAULT 0,
+    deletions INTEGER DEFAULT 0,
+    captured_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_session_diffs_session ON session_diffs(session_id);
 """

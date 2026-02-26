@@ -3,6 +3,7 @@
 	import Shell from '$lib/components/Shell.svelte';
 	import WorkspacePicker from '$lib/components/WorkspacePicker.svelte';
 	import SkillPicker from '$lib/components/SkillPicker.svelte';
+	import GitHubPanel from '$lib/components/GitHubPanel.svelte';
 	import PromptInput from '$lib/components/PromptInput.svelte';
 	import StreamOutput from '$lib/components/StreamOutput.svelte';
 	import ToolCallCard from '$lib/components/ToolCallCard.svelte';
@@ -10,11 +11,13 @@
 	import TabBar from '$lib/components/TabBar.svelte';
 	import { workspacesStore } from '$stores/workspaces.svelte';
 	import { tabsStore } from '$stores/tabs.svelte';
+	import { githubStore } from '$stores/github.svelte';
 	import { initGlobalShortcuts } from '$lib/actions/shortcuts';
-	import type { SkillInfo, AgentInfo } from '$types/index';
+	import type { SkillInfo, AgentInfo, GitHubIssue } from '$types/index';
 
 	let selectedSkill = $state<string | null>(null);
 	let selectedAgent = $state<string | null>(null);
+	let promptPrefill = $state<string | null>(null);
 	let cleanupShortcuts: (() => void) | undefined;
 
 	onMount(() => {
@@ -61,6 +64,27 @@
 		tabsStore.activeSession?.cancel();
 	}
 
+	function handleSelectIssue(issue: GitHubIssue) {
+		const body = issue.body ? `\n\n${issue.body}` : '';
+		promptPrefill = `Issue #${issue.number}: ${issue.title}${body}`;
+	}
+
+	function handleUseAsContext(output: string) {
+		// Open a new tab with the output as prefill
+		tabsStore.addTab('Context');
+		promptPrefill = output;
+	}
+
+	// Load GitHub data when workspace changes
+	$effect(() => {
+		const ws = workspacesStore.currentWorkspace;
+		if (ws?.repo_owner) {
+			githubStore.loadForWorkspace(ws.id);
+		} else {
+			githubStore.reset();
+		}
+	});
+
 	const currentSession = $derived(tabsStore.activeSession);
 </script>
 
@@ -71,6 +95,14 @@
 				onSelectSkill={handleSelectSkill}
 				onSelectAgent={handleSelectAgent}
 			/>
+			{#if workspacesStore.currentWorkspace?.repo_owner && workspacesStore.currentWorkspaceId}
+				<div class="mt-3 border-t border-[var(--color-border)] pt-3">
+					<GitHubPanel
+						workspaceId={workspacesStore.currentWorkspaceId}
+						onSelectIssue={handleSelectIssue}
+					/>
+				</div>
+			{/if}
 		{:else if workspacesStore.currentWorkspaceId}
 			<div class="flex items-center justify-center py-8">
 				<span class="text-xs text-[var(--color-text-muted)]">Loading...</span>
@@ -104,7 +136,7 @@
 					<div class="flex min-w-0 flex-1 flex-col">
 						<!-- Stream output -->
 						<div class="flex-1">
-							<StreamOutput session={currentSession} />
+							<StreamOutput session={currentSession} onUseAsContext={handleUseAsContext} />
 						</div>
 
 						<!-- Prompt input -->
@@ -114,6 +146,7 @@
 								disabled={!workspacesStore.currentWorkspaceId}
 								{selectedSkill}
 								{selectedAgent}
+								prefill={promptPrefill}
 								onSubmit={handleSubmit}
 								onCancel={handleCancel}
 							/>

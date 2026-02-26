@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 
 from dcc.config import settings
 from dcc.engine.event_converter import convert_cli_event
+from dcc.engine.git_diff import DiffCapture, capture_head_ref, compute_session_diff
 from dcc.engine.stream_parser import parse_cli_line
 from dcc.engine.types import AgUiEvent, AgUiEventType
 
@@ -36,6 +37,8 @@ class CliRunner:
         self.model = model
         self._process: asyncio.subprocess.Process | None = None
         self._cancelled = False
+        self._head_before: str | None = None
+        self._diff_capture: DiffCapture | None = None
 
     def _build_command(self) -> list[str]:
         cmd = [
@@ -65,12 +68,19 @@ class CliRunner:
         env.pop("CLAUDECODE", None)
         return env
 
+    @property
+    def diff_capture(self) -> DiffCapture | None:
+        return self._diff_capture
+
     async def run(self) -> AsyncIterator[AgUiEvent]:
         """Run CLI subprocess and yield AG-UI events."""
         cmd = self._build_command()
         env = self._build_env()
 
         logger.info("Starting CLI: %s (cwd=%s)", " ".join(cmd), self.workspace_path)
+
+        # Capture HEAD before run for diff
+        self._head_before = await capture_head_ref(self.workspace_path)
 
         # Emit RunStarted
         yield AgUiEvent(
@@ -134,6 +144,14 @@ class CliRunner:
             got_result = True
 
         finally:
+            # Capture diff after CLI run
+            try:
+                self._diff_capture = await compute_session_diff(
+                    self.workspace_path, self._head_before
+                )
+            except Exception:
+                logger.exception("Failed to capture diff for session %s", self.session_id)
+
             # Fallback: synthetic RunFinished if no result event arrived (bug #1920)
             if not got_result:
                 elapsed_ms = int((time.monotonic() - start_time) * 1000)

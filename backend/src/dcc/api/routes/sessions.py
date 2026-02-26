@@ -140,6 +140,24 @@ async def stream_session(session_id: str):
                     await repository.insert_session_events_batch(event_buffer)
                 except Exception:
                     logger.exception("Failed to persist events for session %s", session_id)
+
+            # Persist diff capture
+            if runner.diff_capture and (
+                runner.diff_capture.diff_stat or runner.diff_capture.diff_content
+            ):
+                try:
+                    dc = runner.diff_capture
+                    await repository.insert_session_diff(
+                        session_id=session_id,
+                        diff_stat=dc.diff_stat,
+                        diff_content=dc.diff_content,
+                        files_changed=dc.files_changed,
+                        insertions=dc.insertions,
+                        deletions=dc.deletions,
+                    )
+                except Exception:
+                    logger.exception("Failed to persist diff for session %s", session_id)
+
             _active_runners.pop(session_id, None)
 
     return EventSourceResponse(event_generator())
@@ -155,6 +173,13 @@ async def cancel_session(session_id: str):
     await runner.cancel()
     await repository.update_session_finished(session_id=session_id, status="cancelled")
     return {"status": "cancelled"}
+
+
+@router.get("/{session_id}/diff")
+async def get_session_diff(session_id: str):
+    """Get captured git diff for a session."""
+    diff = await repository.get_session_diff(session_id)
+    return {"has_diff": bool(diff), "diff": diff}
 
 
 @router.get("")

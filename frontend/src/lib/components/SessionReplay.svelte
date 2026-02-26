@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { X, Wrench, MessageSquare } from '@lucide/svelte';
 	import { fetchSessionEvents } from '$services/api';
+	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import DiffViewer from './DiffViewer.svelte';
 	import type { SessionEvent, Session, ToolCall, AgUiEvent } from '$types/index';
 
 	let {
@@ -130,7 +132,14 @@
 				<!-- Output -->
 				<div class="min-w-0 flex-1 overflow-y-auto p-4">
 					{#if fullOutput}
-						<pre class="font-mono text-sm leading-relaxed whitespace-pre-wrap text-[var(--color-text-primary)]">{fullOutput}</pre>
+						<div class="text-sm leading-relaxed text-[var(--color-text-primary)]">
+							<MarkdownRenderer content={fullOutput} streaming={false} />
+						</div>
+						{#if session?.status === 'completed'}
+							<div class="mt-4">
+								<DiffViewer sessionId={sessionId} collapsed={true} />
+							</div>
+						{/if}
 					{:else}
 						<div class="flex items-center justify-center py-8">
 							<MessageSquare class="mr-2 h-5 w-5 text-[var(--color-text-muted)]" />
