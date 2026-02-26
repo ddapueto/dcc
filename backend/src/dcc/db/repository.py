@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from dcc.db.database import get_db
@@ -436,3 +437,233 @@ async def get_token_efficiency() -> dict:
         **cache_totals,
         "cache_hit_ratio": round(cache_hit_ratio, 4),
     }
+
+
+# --- Pipelines ---
+
+
+async def create_pipeline(
+    workspace_id: str,
+    name: str,
+    description: str | None = None,
+    spec: str | None = None,
+    source_type: str | None = None,
+    source_ref: str | None = None,
+) -> str:
+    pipeline_id = str(uuid.uuid4())
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO pipelines (id, workspace_id, name, description, spec, source_type, source_ref)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (pipeline_id, workspace_id, name, description, spec, source_type, source_ref),
+    )
+    await db.commit()
+    return pipeline_id
+
+
+async def get_pipeline(pipeline_id: str) -> dict | None:
+    db = await get_db()
+    cursor = await db.execute("SELECT * FROM pipelines WHERE id = ?", (pipeline_id,))
+    row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def get_pipelines(
+    workspace_id: str | None = None, limit: int = 50
+) -> list[dict]:
+    db = await get_db()
+    if workspace_id:
+        cursor = await db.execute(
+            "SELECT * FROM pipelines WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?",
+            (workspace_id, limit),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT * FROM pipelines ORDER BY created_at DESC LIMIT ?", (limit,)
+        )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def update_pipeline_status(
+    pipeline_id: str,
+    status: str,
+    total_cost: float | None = None,
+    total_duration_ms: int | None = None,
+) -> None:
+    db = await get_db()
+    sets = ["status = ?"]
+    params: list = [status]
+
+    if total_cost is not None:
+        sets.append("total_cost = ?")
+        params.append(total_cost)
+    if total_duration_ms is not None:
+        sets.append("total_duration_ms = ?")
+        params.append(total_duration_ms)
+
+    if status == "running":
+        sets.append("started_at = datetime('now')")
+    elif status in ("completed", "failed"):
+        sets.append("finished_at = datetime('now')")
+
+    params.append(pipeline_id)
+    await db.execute(
+        f"UPDATE pipelines SET {', '.join(sets)} WHERE id = ?", params
+    )
+    await db.commit()
+
+
+async def delete_pipeline(pipeline_id: str) -> bool:
+    db = await get_db()
+    await db.execute(
+        "DELETE FROM pipeline_steps WHERE pipeline_id = ?", (pipeline_id,)
+    )
+    cursor = await db.execute("DELETE FROM pipelines WHERE id = ?", (pipeline_id,))
+    await db.commit()
+    return cursor.rowcount > 0
+
+
+# --- Pipeline Steps ---
+
+
+async def create_pipeline_step(
+    pipeline_id: str,
+    position: int,
+    name: str,
+    description: str | None = None,
+    agent: str | None = None,
+    skill: str | None = None,
+    model: str | None = None,
+    prompt_template: str | None = None,
+    depends_on: list[str] | None = None,
+) -> str:
+    step_id = str(uuid.uuid4())
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO pipeline_steps
+             (id, pipeline_id, position, name, description, agent, skill, model, prompt_template, depends_on)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            step_id,
+            pipeline_id,
+            position,
+            name,
+            description,
+            agent,
+            skill,
+            model,
+            prompt_template,
+            json.dumps(depends_on or []),
+        ),
+    )
+    await db.commit()
+    return step_id
+
+
+def _parse_step(row: dict) -> dict:
+    """Parse depends_on JSON string to list."""
+    step = dict(row)
+    raw = step.get("depends_on", "[]")
+    try:
+        step["depends_on"] = json.loads(raw) if raw else []
+    except (json.JSONDecodeError, TypeError):
+        step["depends_on"] = []
+    return step
+
+
+async def get_pipeline_steps(pipeline_id: str) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM pipeline_steps WHERE pipeline_id = ? ORDER BY position",
+        (pipeline_id,),
+    )
+    rows = await cursor.fetchall()
+    return [_parse_step(r) for r in rows]
+
+
+async def get_pipeline_step(step_id: str) -> dict | None:
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM pipeline_steps WHERE id = ?", (step_id,)
+    )
+    row = await cursor.fetchone()
+    return _parse_step(row) if row else None
+
+
+async def update_pipeline_step_status(
+    step_id: str,
+    status: str,
+    session_id: str | None = None,
+    output_summary: str | None = None,
+) -> None:
+    db = await get_db()
+    sets = ["status = ?"]
+    params: list = [status]
+
+    if session_id is not None:
+        sets.append("session_id = ?")
+        params.append(session_id)
+    if output_summary is not None:
+        sets.append("output_summary = ?")
+        params.append(output_summary)
+
+    if status == "running":
+        sets.append("started_at = datetime('now')")
+    elif status in ("completed", "failed", "skipped"):
+        sets.append("finished_at = datetime('now')")
+
+    params.append(step_id)
+    await db.execute(
+        f"UPDATE pipeline_steps SET {', '.join(sets)} WHERE id = ?", params
+    )
+    await db.commit()
+
+
+async def update_pipeline_step(
+    step_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    agent: str | None = None,
+    skill: str | None = None,
+    model: str | None = None,
+    prompt_template: str | None = None,
+    position: int | None = None,
+    depends_on: list[str] | None = None,
+) -> None:
+    sets: list[str] = []
+    params: list = []
+    if name is not None:
+        sets.append("name = ?")
+        params.append(name)
+    if description is not None:
+        sets.append("description = ?")
+        params.append(description)
+    if agent is not None:
+        sets.append("agent = ?")
+        params.append(agent)
+    if skill is not None:
+        sets.append("skill = ?")
+        params.append(skill)
+    if model is not None:
+        sets.append("model = ?")
+        params.append(model)
+    if prompt_template is not None:
+        sets.append("prompt_template = ?")
+        params.append(prompt_template)
+    if position is not None:
+        sets.append("position = ?")
+        params.append(position)
+    if depends_on is not None:
+        sets.append("depends_on = ?")
+        params.append(json.dumps(depends_on))
+
+    if not sets:
+        return
+
+    db = await get_db()
+    params.append(step_id)
+    await db.execute(
+        f"UPDATE pipeline_steps SET {', '.join(sets)} WHERE id = ?", params
+    )
+    await db.commit()

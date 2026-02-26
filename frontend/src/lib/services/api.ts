@@ -15,7 +15,10 @@ import type {
 	GitHubIssue,
 	GitHubPR,
 	SessionDiff,
-	McpServer
+	McpServer,
+	Pipeline,
+	PipelineStep,
+	AgentRouteInfo
 } from '$types/index';
 
 const BASE = '/api';
@@ -234,4 +237,125 @@ export async function fetchMcps(
 	workspaceId: string
 ): Promise<{ servers: McpServer[] }> {
 	return request(`/config/${workspaceId}/mcps`);
+}
+
+// --- Pipelines ---
+
+export async function fetchPipelines(
+	workspaceId?: string,
+	limit: number = 50
+): Promise<{ pipelines: Pipeline[] }> {
+	const qs = new URLSearchParams();
+	if (workspaceId) qs.set('workspace_id', workspaceId);
+	qs.set('limit', String(limit));
+	return request(`/pipelines?${qs}`);
+}
+
+export async function fetchPipeline(
+	id: string
+): Promise<{ pipeline: Pipeline; steps: PipelineStep[] }> {
+	return request(`/pipelines/${id}`);
+}
+
+export async function createPipeline(params: {
+	workspace_id: string;
+	name: string;
+	description?: string;
+	spec?: string;
+	source_type?: string;
+	source_ref?: string;
+}): Promise<{ pipeline_id: string }> {
+	return request('/pipelines', {
+		method: 'POST',
+		body: JSON.stringify(params)
+	});
+}
+
+export async function generatePipeline(params: {
+	workspace_id: string;
+	name: string;
+	description?: string;
+	spec?: string;
+	milestone_number?: number;
+}): Promise<{ pipeline: Pipeline; steps: PipelineStep[] }> {
+	return request('/pipelines/generate', {
+		method: 'POST',
+		body: JSON.stringify(params)
+	});
+}
+
+export async function deletePipeline(id: string): Promise<{ deleted: boolean }> {
+	return request(`/pipelines/${id}`, { method: 'DELETE' });
+}
+
+export async function updatePipelineStatus(
+	id: string,
+	status: string
+): Promise<{ status: string }> {
+	return request(`/pipelines/${id}/status`, {
+		method: 'PATCH',
+		body: JSON.stringify({ status })
+	});
+}
+
+export async function addPipelineStep(
+	pipelineId: string,
+	step: {
+		position: number;
+		name: string;
+		description?: string;
+		agent?: string;
+		skill?: string;
+		model?: string;
+		prompt_template?: string;
+		depends_on?: string[];
+	}
+): Promise<{ step_id: string; suggested_agent: string | null }> {
+	return request(`/pipelines/${pipelineId}/steps`, {
+		method: 'POST',
+		body: JSON.stringify(step)
+	});
+}
+
+export async function updatePipelineStep(
+	pipelineId: string,
+	stepId: string,
+	updates: Partial<{
+		name: string;
+		description: string;
+		agent: string;
+		skill: string;
+		model: string;
+		prompt_template: string;
+		position: number;
+		depends_on: string[];
+	}>
+): Promise<{ updated: boolean }> {
+	return request(`/pipelines/${pipelineId}/steps/${stepId}`, {
+		method: 'PATCH',
+		body: JSON.stringify(updates)
+	});
+}
+
+export async function deletePipelineStep(
+	pipelineId: string,
+	stepId: string
+): Promise<{ deleted: boolean }> {
+	return request(`/pipelines/${pipelineId}/steps/${stepId}`, { method: 'DELETE' });
+}
+
+export async function cancelPipeline(id: string): Promise<void> {
+	await request(`/pipelines/${id}/cancel`, { method: 'POST' });
+}
+
+export async function pausePipeline(id: string): Promise<void> {
+	await request(`/pipelines/${id}/pause`, { method: 'POST' });
+}
+
+export async function resumePipeline(id: string): Promise<void> {
+	await request(`/pipelines/${id}/resume`, { method: 'POST' });
+}
+
+export async function fetchAvailableAgents(): Promise<{ agents: AgentRouteInfo[] }> {
+	return request('/pipelines/agents');
 }

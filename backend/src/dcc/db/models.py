@@ -72,4 +72,40 @@ CREATE TABLE IF NOT EXISTS session_diffs (
     captured_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_session_diffs_session ON session_diffs(session_id);
+
+CREATE TABLE IF NOT EXISTS pipelines (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+    name TEXT NOT NULL,
+    description TEXT,
+    spec TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    source_type TEXT,
+    source_ref TEXT,
+    total_cost REAL DEFAULT 0,
+    total_duration_ms INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    started_at TEXT,
+    finished_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pipeline_steps (
+    id TEXT PRIMARY KEY,
+    pipeline_id TEXT NOT NULL REFERENCES pipelines(id),
+    position INTEGER NOT NULL DEFAULT 0,
+    name TEXT NOT NULL,
+    description TEXT,
+    agent TEXT,
+    skill TEXT,
+    model TEXT,
+    prompt_template TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    session_id TEXT REFERENCES sessions(id),
+    output_summary TEXT,
+    depends_on TEXT DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    started_at TEXT,
+    finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_pipeline_steps_pipeline ON pipeline_steps(pipeline_id);
 """

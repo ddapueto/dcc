@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–4 complete.
+DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–5 complete.
 
 ## Tech Stack
 
@@ -17,11 +17,11 @@ DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claud
 dcc/
   backend/
     src/dcc/
-      api/routes/        # REST + SSE + analytics + GitHub proxy endpoints
+      api/routes/        # REST + SSE + analytics + GitHub proxy + pipeline endpoints
       db/                # SQLite: models, database, repository, seed
-      engine/            # CLI runner, stream parser, event converter, gh client, git diff
+      engine/            # CLI runner, stream parser, event converter, gh client, git diff, pipeline executor, agent router, plan builder
       workspace/         # Scanner for .claude/ directories, git detection, MCP scanner
-    tests/               # pytest tests (76 tests)
+    tests/               # pytest tests (105 tests)
   frontend/
     src/
       lib/
@@ -29,7 +29,7 @@ dcc/
         components/      # Svelte 5 components
           dashboard/     # Analytics charts (StatCard, StatusDonut, CostBarChart, CostTrendChart, TopSkillsList)
         services/        # API + SSE clients
-        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics, github)
+        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics, github, pipelines)
         types/           # TypeScript interfaces
       routes/            # SvelteKit pages
         dashboard/       # Analytics dashboard
@@ -37,6 +37,7 @@ dcc/
         history/         # Session history + replay
         config/          # CLAUDE.md / rules / settings viewer
         manage/          # CRUD workspaces / tenants
+        pipelines/       # Pipeline list, detail (DAG view), creation wizard
   docs/                  # Technical docs
 ```
 
@@ -54,7 +55,7 @@ dcc/
 ```bash
 # Backend
 cd backend && make dev      # Run FastAPI dev server (:8000)
-cd backend && make test     # Run tests (76 tests)
+cd backend && make test     # Run tests (105 tests)
 cd backend && make lint     # Run ruff check + mypy
 
 # Frontend
@@ -87,4 +88,13 @@ cd frontend && npx svelte-check  # Type check
 - Context sharing: "Use as context" button on completed sessions opens new tab with output as prefill
 - ConfigViewer MCPs tab: shows MCP servers with name, command, args, source badge (workspace/global)
 - Schema changes require deleting `dcc.db` to recreate (no migrations) — `session_diffs` table, `repo_owner`/`repo_name` columns on workspaces
-- DB tables: tenants, workspaces, sessions, token_usage, session_events, session_diffs
+- DB tables: tenants, workspaces, sessions, token_usage, session_events, session_diffs, pipelines, pipeline_steps
+- Pipeline engine: PipelineExecutor runs steps respecting depends_on DAG, parallel execution (max_parallel), SSE streaming of pipeline-level events
+- Pipeline events: PipelineStarted, PipelineStepStarted, PipelineStepCompleted, PipelineStepFailed, PipelineCompleted, PipelineFailed
+- Agent router: keyword-based agent suggestion for pipeline steps (agent_router.py)
+- Plan builder: constructs planner prompts from spec or milestone issues, parses Claude output to steps (plan_builder.py)
+- Pipeline API: CRUD at `/api/pipelines/*`, generate from spec/milestone, execute via SSE, cancel/pause/resume
+- Pipeline steps use depends_on as JSON TEXT array of step IDs (no junction table)
+- Pipeline context passing: {{prev_output}}, {{step.ID.output}}, {{spec}} in prompt templates
+- Pipeline DAG visualization: SVG with topological sort layering, foreignObject for node HTML (PipelineGraph.svelte)
+- Pipeline creation wizard: 3-step flow (Source → Review → Confirm) with From Spec / From Milestone modes

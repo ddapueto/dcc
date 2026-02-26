@@ -236,3 +236,72 @@ export interface McpServer {
 	args: string[];
 	source: 'workspace' | 'global';
 }
+
+// --- Pipelines ---
+
+export type PipelineStatus = 'draft' | 'ready' | 'running' | 'paused' | 'completed' | 'failed';
+export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+
+export interface Pipeline {
+	id: string;
+	workspace_id: string;
+	name: string;
+	description: string | null;
+	spec: string | null;
+	status: PipelineStatus;
+	source_type: string | null;
+	source_ref: string | null;
+	total_cost: number;
+	total_duration_ms: number;
+	created_at: string;
+	started_at: string | null;
+	finished_at: string | null;
+}
+
+export interface PipelineStep {
+	id: string;
+	pipeline_id: string;
+	position: number;
+	name: string;
+	description: string | null;
+	agent: string | null;
+	skill: string | null;
+	model: string | null;
+	prompt_template: string | null;
+	status: StepStatus;
+	session_id: string | null;
+	output_summary: string | null;
+	depends_on: string[];
+	created_at: string;
+	started_at: string | null;
+	finished_at: string | null;
+}
+
+export interface AgentRouteInfo {
+	name: string;
+	keywords: string[];
+}
+
+export type PipelineEventType =
+	| 'PipelineStarted'
+	| 'PipelineStepStarted'
+	| 'PipelineStepCompleted'
+	| 'PipelineStepFailed'
+	| 'PipelineCompleted'
+	| 'PipelineFailed';
+
+export interface PipelineEvent {
+	type: PipelineEventType;
+	session_id: string;
+	pipeline_id?: string;
+	step_id?: string;
+	step_name?: string;
+	step_position?: number;
+	step_agent?: string;
+	step_status?: string;
+	steps_completed?: number;
+	steps_total?: number;
+	cost_usd?: number;
+	duration_ms?: number;
+	error?: string;
+}
