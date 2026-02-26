@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–3 complete.
+DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–4 complete.
 
 ## Tech Stack
 
@@ -17,11 +17,11 @@ DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claud
 dcc/
   backend/
     src/dcc/
-      api/routes/        # REST + SSE + analytics endpoints
+      api/routes/        # REST + SSE + analytics + GitHub proxy endpoints
       db/                # SQLite: models, database, repository, seed
-      engine/            # CLI runner, stream parser, event converter
-      workspace/         # Scanner for .claude/ directories
-    tests/               # pytest tests (51 tests)
+      engine/            # CLI runner, stream parser, event converter, gh client, git diff
+      workspace/         # Scanner for .claude/ directories, git detection, MCP scanner
+    tests/               # pytest tests (76 tests)
   frontend/
     src/
       lib/
@@ -29,7 +29,7 @@ dcc/
         components/      # Svelte 5 components
           dashboard/     # Analytics charts (StatCard, StatusDonut, CostBarChart, CostTrendChart, TopSkillsList)
         services/        # API + SSE clients
-        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics)
+        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics, github)
         types/           # TypeScript interfaces
       routes/            # SvelteKit pages
         dashboard/       # Analytics dashboard
@@ -54,7 +54,7 @@ dcc/
 ```bash
 # Backend
 cd backend && make dev      # Run FastAPI dev server (:8000)
-cd backend && make test     # Run tests (51 tests)
+cd backend && make test     # Run tests (76 tests)
 cd backend && make lint     # Run ruff check + mypy
 
 # Frontend
@@ -78,3 +78,13 @@ cd frontend && npx svelte-check  # Type check
 - Toast notifications: auto-dismiss 4s, background tab completion triggers toastStore from TabSession
 - Analytics: 5 SQL aggregation functions in repository.py, 5 GET endpoints at `/api/analytics/*`
 - Dashboard charts are pure SVG/HTML (StatusDonut, CostTrendChart, CostBarChart, TopSkillsList, StatCard)
+- Git repo auto-detection: parses `.git/config` remote origin (SSH + HTTPS GitHub URLs) → `repo_owner`/`repo_name` on workspaces
+- MCP server scanner: reads `.mcp.json` (workspace-level) + `settings.local.json` (global config_dir), workspace overrides global on name conflict
+- GitHub integration: `gh_client.py` wraps `gh api` subprocess (15s timeout), `github.py` router proxies milestones/issues/PRs at `/api/github/*`
+- Git diff capture: CliRunner snapshots HEAD before run, computes `git diff` + `git log` after run, stores in `session_diffs` table (50KB max)
+- DiffViewer: lazy-loads diff on expand, colored lines (+green/-red/@@cyan), badge shows "N files +ins -del"
+- GitHubPanel: collapsible sections (issues/PRs/milestones) in /run sidebar, click issue pre-fills prompt with `Issue #N: title\n\nbody`
+- Context sharing: "Use as context" button on completed sessions opens new tab with output as prefill
+- ConfigViewer MCPs tab: shows MCP servers with name, command, args, source badge (workspace/global)
+- Schema changes require deleting `dcc.db` to recreate (no migrations) — `session_diffs` table, `repo_owner`/`repo_name` columns on workspaces
+- DB tables: tenants, workspaces, sessions, token_usage, session_events, session_diffs
