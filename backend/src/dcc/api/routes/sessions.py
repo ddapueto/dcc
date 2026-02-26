@@ -38,6 +38,7 @@ async def create_session(req: CreateSessionRequest):
         prompt=req.prompt,
         skill=req.skill,
         agent=req.agent,
+        model=req.model,
     )
 
     return {"session_id": session_id}

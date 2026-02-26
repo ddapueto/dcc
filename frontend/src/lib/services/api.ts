@@ -194,7 +194,10 @@ export async function fetchGitHubIssue(
 	workspaceId: string,
 	number: number
 ): Promise<GitHubIssue> {
-	return request(`/github/issues/${number}?workspace_id=${workspaceId}`);
+	const data = await request<{ issue: GitHubIssue }>(
+		`/github/issues/${number}?workspace_id=${workspaceId}`
+	);
+	return data.issue;
 }
 
 export async function fetchGitHubPRs(
@@ -210,10 +213,11 @@ export async function createGitHubIssue(params: {
 	body?: string;
 	labels?: string[];
 }): Promise<GitHubIssue> {
-	return request('/github/issues', {
+	const data = await request<{ issue: GitHubIssue }>('/github/issues', {
 		method: 'POST',
 		body: JSON.stringify(params)
 	});
+	return data.issue;
 }
 
 // --- Session Diff ---

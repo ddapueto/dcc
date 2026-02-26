@@ -125,13 +125,14 @@ async def create_session(
     prompt: str,
     skill: str | None = None,
     agent: str | None = None,
+    model: str | None = None,
 ) -> str:
     session_id = str(uuid.uuid4())
     db = await get_db()
     await db.execute(
-        """INSERT INTO sessions (id, workspace_id, prompt, skill, agent, status)
-           VALUES (?, ?, ?, ?, ?, 'running')""",
-        (session_id, workspace_id, prompt, skill, agent),
+        """INSERT INTO sessions (id, workspace_id, prompt, skill, agent, model, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'running')""",
+        (session_id, workspace_id, prompt, skill, agent, model),
     )
     await db.commit()
     return session_id

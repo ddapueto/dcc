@@ -76,7 +76,7 @@
 			return;
 		}
 
-		if (e.key === 'ArrowUp' && prompt === '' || (e.key === 'ArrowUp' && historyIndex >= 0)) {
+		if ((e.key === 'ArrowUp' && prompt === '') || (e.key === 'ArrowUp' && historyIndex >= 0)) {
 			e.preventDefault();
 			const history = getHistory();
 			if (history.length === 0) return;

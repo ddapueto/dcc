@@ -85,7 +85,7 @@ async def get_issue(
     owner, repo = await _get_repo(workspace_id)
     try:
         data = await gh_api(f"/repos/{owner}/{repo}/issues/{number}")
-        return data
+        return {"issue": data}
     except GhError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
@@ -122,6 +122,6 @@ async def create_issue(req: CreateIssueRequest):
         payload["labels"] = req.labels
     try:
         data = await gh_api(f"/repos/{owner}/{repo}/issues", method="POST", body=payload)
-        return data
+        return {"issue": data}
     except GhError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e

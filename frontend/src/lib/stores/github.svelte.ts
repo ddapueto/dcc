@@ -34,7 +34,7 @@ class GitHubStore {
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : 'Failed to load GitHub data';
 			// If 400 = no repo configured, mark accordingly
-			if (this.error.includes('400')) {
+			if (this.error && this.error.includes('400')) {
 				this.hasRepo = false;
 			}
 		} finally {
