@@ -2,12 +2,12 @@
 
 ## Project Overview
 
-DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–6 complete.
+DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–7 complete.
 
 ## Tech Stack
 
 - **Frontend**: SvelteKit + Svelte 5 (runes) + Tailwind v4 + marked + highlight.js
-- **Backend**: FastAPI (Python 3.13) + aiosqlite + sse-starlette
+- **Backend**: FastAPI (Python 3.13) + aiosqlite + sse-starlette + pyyaml
 - **Package manager**: uv (backend), npm (frontend)
 - **DB**: SQLite local file
 
@@ -17,19 +17,19 @@ DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claud
 dcc/
   backend/
     src/dcc/
-      api/routes/        # REST + SSE + analytics + GitHub proxy + workflows endpoints
+      api/routes/        # REST + SSE + analytics + GitHub proxy + workflows + agents endpoints
       db/                # SQLite: models, database, repository, seed
       engine/            # CLI runner, stream parser, event converter, gh client, git diff, monitor processor, workflow templates
       workspace/         # Scanner for .claude/ directories, git detection, MCP scanner
-    tests/               # pytest tests (102 tests)
+    tests/               # pytest tests (122 tests)
   frontend/
     src/
       lib/
         actions/         # Keyboard shortcuts (shortcuts.ts)
         components/      # Svelte 5 components
-          dashboard/     # Analytics charts (StatCard, StatusDonut, CostBarChart, CostTrendChart, TopSkillsList)
+          dashboard/     # Analytics charts (StatCard, StatusDonut, CostBarChart, CostTrendChart, TopSkillsList, AgentOverviewCard)
         services/        # API + SSE clients
-        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics, github, workflows, monitor)
+        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics, github, workflows, monitor, agents)
         types/           # TypeScript interfaces
       routes/            # SvelteKit pages
         dashboard/       # Analytics dashboard
@@ -38,6 +38,7 @@ dcc/
         config/          # CLAUDE.md / rules / settings viewer
         manage/          # CRUD workspaces / tenants
         workflows/       # Workflow gallery, detail, custom editor
+        agents/          # Agent registry, stats, delegation graph
   docs/                  # Technical docs
 ```
 
@@ -55,7 +56,7 @@ dcc/
 ```bash
 # Backend
 cd backend && make dev      # Run FastAPI dev server (:8000)
-cd backend && make test     # Run tests (102 tests)
+cd backend && make test     # Run tests (122 tests)
 cd backend && make lint     # Run ruff check + mypy
 
 # Frontend
@@ -88,7 +89,7 @@ cd frontend && npx svelte-check  # Type check
 - Context sharing: "Use as context" button on completed sessions opens new tab with output as prefill
 - ConfigViewer MCPs tab: shows MCP servers with name, command, args, source badge (workspace/global)
 - Schema changes require deleting `dcc.db` to recreate (no migrations)
-- DB tables: tenants, workspaces, sessions, token_usage, session_events, session_diffs, workflows, monitor_tasks
+- DB tables: tenants, workspaces, sessions, token_usage, session_events, session_diffs, workflows, monitor_tasks, agent_registry
 - **Workflows**: Prompt templates with `{{key}}` placeholders. Built-in (6 seeded) + custom. Launch creates a session with resolved prompt. DCC does NOT orchestrate — Claude Code handles orchestration natively.
 - Workflow API: CRUD at `/api/workflows/*`, launch endpoint resolves template + creates session
 - Workflow templates: Spec-Driven Development, TDD Flow, Issue to PR, Security Audit, Code Review, Refactor Module
@@ -96,7 +97,7 @@ cd frontend && npx svelte-check  # Type check
 - WorkflowLauncher: dynamic form generated from `workflow.parameters`, prompt preview, model selector
 - **Monitor**: Real-time observer that parses ToolCallStart/End/Result events to build execution tree
 - Monitor nesting: stack-based detection — when Claude uses "Task" tool, children are nested under parent
-- MonitorProcessor (backend): `process_event()` creates/updates monitor_tasks, `_extract_description()` for human-readable summaries
+- MonitorProcessor (backend): `process_event()` creates/updates monitor_tasks, `_extract_task_metadata()` extracts description + subagent_type + subagent_model
 - MonitorStore (frontend): mirrors backend logic client-side, builds task tree from flat array via parent_id
 - Monitor feeds from session SSE stream (no separate SSE) — `TabSession.handleEvent()` forwards to `monitorStore.processEvent()`
 - MonitorPanel: Timeline (list) + Graph (DAG) views, stats bar (total/running/completed/failed), TaskDetail panel
@@ -106,3 +107,22 @@ cd frontend && npx svelte-check  # Type check
 - `/workflows/new`: WorkflowEditor for creating custom workflows
 - `/workflows/[id]`: detail view with launcher + edit toggle for custom workflows
 - `/run` page: tool calls panel has Monitor toggle — shows MonitorPanel when active
+- **Agent Intelligence (Fase 7)**: Observability and management for agent teams
+- Agent scanner: YAML frontmatter parsing (pyyaml) extracts tools, disallowed_tools, permission_mode, max_turns, skills, memory, background, isolation, system_prompt; fallback to regex if no frontmatter
+- AgentInfo expanded: 9 new fields from YAML frontmatter on top of name/filename/description/model
+- Agent registry: `agent_registry` table with UNIQUE(workspace_id, name), synced on workspace scan/seed via `sync_agents_for_workspace()`
+- Agent registry API: `GET /api/workspaces/{id}/agents`, `GET /api/workspaces/{id}/agents/{name}`
+- CLI runner fix: `--agent` flag now passed to Claude CLI subprocess when agent is specified
+- Monitor enhanced: `monitor_tasks` has `subagent_type` and `subagent_model` columns, extracted from Task tool's `subagent_type` and `model` fields
+- Agent analytics: 4 SQL functions (`get_agent_usage_stats`, `get_agent_cost_trend`, `get_subagent_delegation_stats`, `get_agent_comparison`)
+- Agent analytics API: `GET /api/agents/stats`, `GET /api/agents/stats/{name}/trend`, `GET /api/agents/delegations`, `GET /api/agents/comparison?agents=a,b`
+- Session history filterable by agent: `agent` param on `GET /api/sessions/history`
+- AgentsStore (frontend): loads agents for workspace, stats, delegations, selected agent trend
+- `/agents` page: stat cards (total agents, models, sessions, cost) + agent card grid + stats table (sortable) + delegation graph (SVG)
+- AgentCard: glass card with model badge (color-coded), tools/turns/isolation badges, usage stats
+- AgentDetail: config badges, stats grid, cost trend chart
+- DelegationGraph: SVG with parent agents → subagent types, edge thickness by frequency
+- AgentOverviewCard: top 5 agents bar chart on `/dashboard`
+- Monitor badges: `@subagent_type` (purple) and `subagent_model` shown in TaskNode, MonitorPanel timeline, and TaskDetail
+- SkillPicker: agents tab shows tools count, max_turns, isolation badges
+- MonitorStore (frontend): `_extractTaskMetadata()` mirrors backend, extracts subagent_type/subagent_model client-side
