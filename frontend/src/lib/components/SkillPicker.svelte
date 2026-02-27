@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { workspacesStore } from '$stores/workspaces.svelte';
-	import { Zap, Bot } from '@lucide/svelte';
+	import { Zap, Bot, Wrench, Repeat, Shield } from '@lucide/svelte';
 	import type { SkillInfo, AgentInfo } from '$types/index';
 
 	let {
@@ -89,6 +89,28 @@
 						<p class="mt-0.5 pl-5.5 text-xs text-[var(--color-text-muted)] line-clamp-2">
 							{agent.description}
 						</p>
+					{/if}
+					{#if agent.tools?.length || agent.max_turns || agent.isolation}
+						<div class="mt-1 flex flex-wrap gap-1 pl-5.5">
+							{#if agent.tools?.length}
+								<span class="flex items-center gap-0.5 rounded bg-[var(--color-bg-input)] px-1 py-0.5 text-[9px] text-[var(--color-text-muted)]">
+									<Wrench class="h-2 w-2" />
+									{agent.tools.length}
+								</span>
+							{/if}
+							{#if agent.max_turns}
+								<span class="flex items-center gap-0.5 rounded bg-[var(--color-bg-input)] px-1 py-0.5 text-[9px] text-[var(--color-text-muted)]">
+									<Repeat class="h-2 w-2" />
+									{agent.max_turns}
+								</span>
+							{/if}
+							{#if agent.isolation}
+								<span class="flex items-center gap-0.5 rounded bg-orange-500/10 px-1 py-0.5 text-[9px] text-orange-400">
+									<Shield class="h-2 w-2" />
+									{agent.isolation}
+								</span>
+							{/if}
+						</div>
 					{/if}
 				</button>
 			{/each}

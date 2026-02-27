@@ -53,6 +53,7 @@ async def session_history(
     tenant_id: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    agent: str | None = None,
     limit: int = 25,
     offset: int = 0,
 ):
@@ -62,6 +63,7 @@ async def session_history(
         tenant_id=tenant_id,
         status=status,
         search=search,
+        agent=agent,
         limit=limit,
         offset=offset,
     )

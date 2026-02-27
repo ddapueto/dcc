@@ -157,12 +157,55 @@ async def test_task_tool_nesting():
 
 
 @pytest.mark.asyncio
-async def test_extract_description():
-    assert MonitorProcessor._extract_description("Read", '{"file_path": "/a/b.py"}') == "/a/b.py"
-    assert MonitorProcessor._extract_description("Bash", '{"command": "npm test"}') == "npm test"
-    assert MonitorProcessor._extract_description("Grep", '{"pattern": "TODO"}') == "TODO"
-    assert MonitorProcessor._extract_description("Task", '{"description": "explore"}') == "explore"
-    assert MonitorProcessor._extract_description("Unknown", None) == "Unknown"
+async def test_extract_task_metadata():
+    md = MonitorProcessor._extract_task_metadata
+    assert md("Read", '{"file_path": "/a/b.py"}') == {
+        "description": "/a/b.py", "subagent_type": None, "subagent_model": None,
+    }
+    assert md("Bash", '{"command": "npm test"}') == {
+        "description": "npm test", "subagent_type": None, "subagent_model": None,
+    }
+    assert md("Grep", '{"pattern": "TODO"}') == {
+        "description": "TODO", "subagent_type": None, "subagent_model": None,
+    }
+    assert md("Unknown", None) == {
+        "description": "Unknown", "subagent_type": None, "subagent_model": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_extract_task_metadata_with_subagent():
+    result = MonitorProcessor._extract_task_metadata(
+        "Task",
+        '{"description": "explore codebase", "subagent_type": "Explore", "model": "haiku", "prompt": "find files"}',
+    )
+    assert result["description"] == "explore codebase"
+    assert result["subagent_type"] == "Explore"
+    assert result["subagent_model"] == "haiku"
+
+
+@pytest.mark.asyncio
+async def test_task_with_subagent_type_stored():
+    """Task tool with subagent_type should be stored in monitor_tasks."""
+    session_id = await repository.create_session("w1", "test")
+    monitor = MonitorProcessor(session_id)
+
+    result = await monitor.process_event(AgUiEvent(
+        type=AgUiEventType.TOOL_CALL_START,
+        session_id=session_id,
+        tool_call_id="tc_explore",
+        tool_name="Task",
+        tool_input='{"description": "search code", "subagent_type": "Explore", "model": "haiku", "prompt": "find stuff"}',
+    ))
+
+    assert result is not None
+    assert result["subagent_type"] == "Explore"
+    assert result["subagent_model"] == "haiku"
+
+    tasks = await repository.get_monitor_tasks(session_id)
+    assert len(tasks) == 1
+    assert tasks[0]["subagent_type"] == "Explore"
+    assert tasks[0]["subagent_model"] == "haiku"
 
 
 @pytest.mark.asyncio
@@ -182,3 +225,35 @@ async def test_ignores_events_without_tool_call_id():
         text="hello",
     ))
     assert result is None
+
+
+def test_cli_runner_agent_flag():
+    """CliRunner should include --agent flag when agent is specified."""
+    from dcc.engine.cli_runner import CliRunner
+
+    runner = CliRunner(
+        session_id="test-session",
+        workspace_path="/tmp",
+        config_dir="/tmp/config",
+        prompt="do something",
+        agent="code-reviewer",
+        model="sonnet",
+    )
+    cmd = runner._build_command()
+    assert "--agent" in cmd
+    agent_idx = cmd.index("--agent")
+    assert cmd[agent_idx + 1] == "code-reviewer"
+
+
+def test_cli_runner_no_agent_flag():
+    """CliRunner should NOT include --agent flag when agent is None."""
+    from dcc.engine.cli_runner import CliRunner
+
+    runner = CliRunner(
+        session_id="test-session",
+        workspace_path="/tmp",
+        config_dir="/tmp/config",
+        prompt="do something",
+    )
+    cmd = runner._build_command()
+    assert "--agent" not in cmd

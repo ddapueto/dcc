@@ -63,7 +63,7 @@ class MonitorStore {
 		const depth = this._taskStack.length;
 		const taskId = `mt_${++this._idCounter}`;
 
-		const description = this._extractDescription(event.tool_name, event.tool_input);
+		const metadata = this._extractTaskMetadata(event.tool_name, event.tool_input);
 
 		const task: MonitorTask = {
 			id: taskId,
@@ -71,7 +71,9 @@ class MonitorStore {
 			parent_id: parentId,
 			tool_call_id: event.tool_call_id,
 			tool_name: event.tool_name,
-			description,
+			description: metadata.description,
+			subagent_type: metadata.subagent_type,
+			subagent_model: metadata.subagent_model,
 			status: 'running',
 			input_summary: event.tool_input?.slice(0, 500) ?? null,
 			output_summary: null,
@@ -150,18 +152,29 @@ class MonitorStore {
 		}
 	}
 
-	private _extractDescription(toolName: string, toolInput?: string): string {
-		if (!toolInput) return toolName;
+	private _extractTaskMetadata(
+		toolName: string,
+		toolInput?: string
+	): { description: string; subagent_type: string | null; subagent_model: string | null } {
+		const result = { description: toolName, subagent_type: null as string | null, subagent_model: null as string | null };
+		if (!toolInput) return result;
 
 		try {
 			const parsed = JSON.parse(toolInput);
-			if (toolName === 'Task') return parsed.description || parsed.prompt || toolName;
-			if (['Read', 'Write', 'Edit'].includes(toolName)) return parsed.file_path || toolName;
-			if (toolName === 'Bash') return (parsed.command || '').slice(0, 100) || toolName;
-			if (['Glob', 'Grep'].includes(toolName)) return parsed.pattern || toolName;
-			return toolName;
+			if (toolName === 'Task') {
+				result.description = (parsed.description || parsed.prompt || toolName).slice(0, 200);
+				result.subagent_type = parsed.subagent_type || null;
+				result.subagent_model = parsed.model || null;
+			} else if (['Read', 'Write', 'Edit'].includes(toolName)) {
+				result.description = parsed.file_path || toolName;
+			} else if (toolName === 'Bash') {
+				result.description = (parsed.command || '').slice(0, 100) || toolName;
+			} else if (['Glob', 'Grep'].includes(toolName)) {
+				result.description = parsed.pattern || toolName;
+			}
+			return result;
 		} catch {
-			return toolName;
+			return result;
 		}
 	}
 

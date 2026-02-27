@@ -1,7 +1,45 @@
 import re
 from pathlib import Path
 
+import yaml
+
 from dcc.workspace.types import AgentInfo, SkillInfo
+
+
+def _ensure_list(val: str | list | None) -> list[str]:
+    """Convert a comma-separated string or list to list[str]."""
+    if val is None:
+        return []
+    if isinstance(val, list):
+        return [str(v).strip() for v in val if v]
+    if isinstance(val, str):
+        return [s.strip() for s in val.split(",") if s.strip()]
+    return []
+
+
+def _parse_agent_frontmatter(content: str) -> tuple[dict, str]:
+    """Parse YAML frontmatter from agent .md file.
+
+    Returns (frontmatter_dict, body_after_frontmatter).
+    If no frontmatter, returns ({}, full_content).
+    """
+    if not content.startswith("---"):
+        return {}, content
+
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        return {}, content
+
+    yaml_text = parts[1]
+    body = parts[2].strip()
+
+    try:
+        data = yaml.safe_load(yaml_text)
+        if not isinstance(data, dict):
+            return {}, content
+        return data, body
+    except yaml.YAMLError:
+        return {}, content
 
 
 def scan_agents(workspace_path: str) -> list[AgentInfo]:
@@ -14,11 +52,43 @@ def scan_agents(workspace_path: str) -> list[AgentInfo]:
     for md_file in sorted(agents_dir.glob("*.md")):
         name = md_file.stem
         content = md_file.read_text(encoding="utf-8", errors="replace")
-        description = _extract_first_line(content)
-        model = _extract_model(content)
-        agents.append(
-            AgentInfo(name=name, filename=md_file.name, description=description, model=model)
-        )
+        fm, body = _parse_agent_frontmatter(content)
+
+        if fm:
+            # YAML frontmatter found — extract all fields
+            description = fm.get("description", "") or _extract_first_line(body)
+            model = fm.get("model") or _extract_model(body)
+            if model:
+                model = str(model).lower()
+
+            agents.append(AgentInfo(
+                name=name,
+                filename=md_file.name,
+                description=str(description)[:200] if description else "",
+                model=model,
+                tools=_ensure_list(fm.get("allowed_tools") or fm.get("tools")),
+                disallowed_tools=_ensure_list(fm.get("disallowed_tools")),
+                permission_mode=fm.get("permission_mode"),
+                max_turns=fm.get("max_turns"),
+                skills=_ensure_list(fm.get("skills")),
+                memory=fm.get("memory"),
+                background=bool(fm.get("background", False)),
+                isolation=fm.get("isolation"),
+                system_prompt=body[:5000] if body else "",
+            ))
+        else:
+            # Fallback: regex-based extraction
+            description = _extract_first_line(content)
+            model = _extract_model(content)
+            agents.append(
+                AgentInfo(
+                    name=name,
+                    filename=md_file.name,
+                    description=description,
+                    model=model,
+                    system_prompt=content[:5000],
+                )
+            )
     return agents
 
 

@@ -26,6 +26,40 @@ export interface AgentInfo {
 	filename: string;
 	description: string;
 	model: string | null;
+	tools: string[];
+	disallowed_tools: string[];
+	permission_mode: string | null;
+	max_turns: number | null;
+	skills: string[];
+	memory: string | null;
+	background: boolean;
+	isolation: string | null;
+	system_prompt: string;
+}
+
+export interface RegisteredAgent extends AgentInfo {
+	id: string;
+	workspace_id: string;
+	first_seen_at: string;
+	last_seen_at: string;
+	is_active: boolean;
+}
+
+export interface AgentUsageStats {
+	name: string;
+	sessions: number;
+	total_cost: number;
+	avg_duration_ms: number | null;
+	success_rate: number;
+	total_input_tokens?: number;
+	total_output_tokens?: number;
+}
+
+export interface AgentDelegation {
+	parent_agent: string | null;
+	subagent_type: string;
+	count: number;
+	avg_duration_ms: number | null;
 }
 
 export interface SkillInfo {
@@ -277,6 +311,8 @@ export interface MonitorTask {
 	tool_call_id: string | null;
 	tool_name: string;
 	description: string | null;
+	subagent_type: string | null;
+	subagent_model: string | null;
 	status: MonitorTaskStatus;
 	input_summary: string | null;
 	output_summary: string | null;

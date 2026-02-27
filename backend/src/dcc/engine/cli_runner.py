@@ -53,6 +53,9 @@ class CliRunner:
         if self.model:
             cmd.extend(["--model", self.model])
 
+        if self.agent:
+            cmd.extend(["--agent", self.agent])
+
         # Build the prompt: if skill, prefix with /skill_name
         prompt = self.prompt
         if self.skill:

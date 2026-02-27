@@ -82,6 +82,20 @@
 				<span class="truncate text-[11px] font-medium text-[var(--color-text-primary)]">
 					{task.tool_name}
 				</span>
+				{#if task.subagent_type}
+					<span
+						class="shrink-0 rounded bg-purple-500/20 px-1 py-0.5 text-[8px] font-medium text-purple-400"
+					>
+						@{task.subagent_type}
+					</span>
+				{/if}
+				{#if task.subagent_model}
+					<span
+						class="shrink-0 rounded bg-[var(--color-bg-card)] px-1 py-0.5 text-[8px] text-[var(--color-text-muted)]"
+					>
+						{task.subagent_model}
+					</span>
+				{/if}
 			</div>
 			{#if task.description}
 				<p class="mt-1 truncate text-[9px] text-[var(--color-text-muted)]">

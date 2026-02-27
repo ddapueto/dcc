@@ -104,3 +104,79 @@ def test_scan_nonexistent_dir():
     skills = scan_skills("/nonexistent/path")
     assert agents == []
     assert skills == []
+
+
+def test_scan_agents_yaml_frontmatter():
+    """Agent with YAML frontmatter should extract all fields."""
+    with tempfile.TemporaryDirectory() as tmp:
+        _make_workspace(tmp, agents={
+            "explorer.md": """---
+description: Explores codebases efficiently
+model: haiku
+allowed_tools: Read, Glob, Grep
+disallowed_tools: Write, Edit
+max_turns: 10
+permission_mode: bypassPermissions
+isolation: worktree
+---
+You are an exploration agent that searches code.""",
+        })
+        agents = scan_agents(tmp)
+        assert len(agents) == 1
+
+        agent = agents[0]
+        assert agent.name == "explorer"
+        assert agent.description == "Explores codebases efficiently"
+        assert agent.model == "haiku"
+        assert agent.tools == ["Read", "Glob", "Grep"]
+        assert agent.disallowed_tools == ["Write", "Edit"]
+        assert agent.max_turns == 10
+        assert agent.permission_mode == "bypassPermissions"
+        assert agent.isolation == "worktree"
+        assert "exploration agent" in agent.system_prompt
+
+
+def test_scan_agents_yaml_list_tools():
+    """Tools as YAML list should work too."""
+    with tempfile.TemporaryDirectory() as tmp:
+        _make_workspace(tmp, agents={
+            "builder.md": """---
+model: sonnet
+allowed_tools:
+  - Read
+  - Write
+  - Bash
+skills:
+  - commit
+  - test
+---
+Builder agent body.""",
+        })
+        agents = scan_agents(tmp)
+        agent = agents[0]
+        assert agent.tools == ["Read", "Write", "Bash"]
+        assert agent.skills == ["commit", "test"]
+        assert agent.model == "sonnet"
+
+
+def test_scan_agents_no_frontmatter_fallback():
+    """Agent without frontmatter should use regex fallback."""
+    with tempfile.TemporaryDirectory() as tmp:
+        _make_workspace(tmp, agents={
+            "simple.md": "This is a simple agent.\nmodel: opus",
+        })
+        agents = scan_agents(tmp)
+        assert len(agents) == 1
+        assert agents[0].description == "This is a simple agent."
+        assert agents[0].model == "opus"
+        assert agents[0].tools == []
+
+
+def test_ensure_list():
+    from dcc.workspace.scanner import _ensure_list
+
+    assert _ensure_list(None) == []
+    assert _ensure_list("Read, Glob, Grep") == ["Read", "Glob", "Grep"]
+    assert _ensure_list(["Read", "Glob"]) == ["Read", "Glob"]
+    assert _ensure_list("") == []
+    assert _ensure_list([]) == []

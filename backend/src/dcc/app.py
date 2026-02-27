@@ -27,6 +27,7 @@ app.add_middleware(
 )
 
 # Register routers
+from dcc.api.routes.agents import router as agents_router  # noqa: E402
 from dcc.api.routes.analytics import router as analytics_router  # noqa: E402
 from dcc.api.routes.config import router as config_router  # noqa: E402
 from dcc.api.routes.github import router as github_router  # noqa: E402
@@ -42,3 +43,4 @@ app.include_router(config_router)
 app.include_router(analytics_router)
 app.include_router(github_router)
 app.include_router(workflows_router)
+app.include_router(agents_router)

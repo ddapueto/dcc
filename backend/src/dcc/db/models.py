@@ -97,6 +97,8 @@ CREATE TABLE IF NOT EXISTS monitor_tasks (
     tool_call_id TEXT,
     tool_name TEXT NOT NULL,
     description TEXT,
+    subagent_type TEXT,
+    subagent_model TEXT,
     status TEXT NOT NULL DEFAULT 'running',
     input_summary TEXT,
     output_summary TEXT,
@@ -106,4 +108,27 @@ CREATE TABLE IF NOT EXISTS monitor_tasks (
     duration_ms INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_monitor_tasks_session ON monitor_tasks(session_id);
+
+CREATE TABLE IF NOT EXISTS agent_registry (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+    name TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    model TEXT,
+    tools TEXT DEFAULT '[]',
+    disallowed_tools TEXT DEFAULT '[]',
+    permission_mode TEXT,
+    max_turns INTEGER,
+    skills TEXT DEFAULT '[]',
+    memory TEXT,
+    background INTEGER NOT NULL DEFAULT 0,
+    isolation TEXT,
+    system_prompt TEXT DEFAULT '',
+    first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+    is_active INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(workspace_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_agent_registry_workspace ON agent_registry(workspace_id);
 """

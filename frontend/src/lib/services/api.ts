@@ -17,7 +17,10 @@ import type {
 	SessionDiff,
 	McpServer,
 	Workflow,
-	MonitorTask
+	MonitorTask,
+	RegisteredAgent,
+	AgentUsageStats,
+	AgentDelegation
 } from '$types/index';
 
 const BASE = '/api';
@@ -310,4 +313,43 @@ export async function fetchMonitorTasks(
 	sessionId: string
 ): Promise<{ tasks: MonitorTask[] }> {
 	return request(`/sessions/${sessionId}/monitor`);
+}
+
+// --- Agents ---
+
+export async function fetchWorkspaceAgents(
+	workspaceId: string
+): Promise<{ agents: RegisteredAgent[] }> {
+	return request(`/workspaces/${workspaceId}/agents`);
+}
+
+export async function fetchAgentDetail(
+	workspaceId: string,
+	name: string
+): Promise<{ agent: RegisteredAgent }> {
+	return request(`/workspaces/${workspaceId}/agents/${name}`);
+}
+
+export async function fetchAgentStats(
+	workspaceId?: string
+): Promise<{ stats: AgentUsageStats[] }> {
+	const qs = workspaceId ? `?workspace_id=${workspaceId}` : '';
+	return request(`/agents/stats${qs}`);
+}
+
+export async function fetchAgentCostTrend(
+	name: string,
+	days: number = 30
+): Promise<{ trend: CostTrendPoint[] }> {
+	return request(`/agents/stats/${name}/trend?days=${days}`);
+}
+
+export async function fetchAgentDelegations(): Promise<{ delegations: AgentDelegation[] }> {
+	return request('/agents/delegations');
+}
+
+export async function fetchAgentComparison(
+	agents: string[]
+): Promise<{ comparison: AgentUsageStats[] }> {
+	return request(`/agents/comparison?agents=${agents.join(',')}`);
 }

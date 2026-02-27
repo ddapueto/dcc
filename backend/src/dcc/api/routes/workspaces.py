@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from dcc.db import repository
+from dcc.db.seed import sync_agents_for_workspace
 from dcc.workspace.scanner import scan_workspace
 from dcc.workspace.types import WorkspaceDetail
 
@@ -61,6 +62,9 @@ async def get_workspace(workspace_id: str):
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     agents, skills, has_md, owner, repo = scan_workspace(ws["path"])
+
+    # Sync agents to registry
+    await sync_agents_for_workspace(workspace_id, ws["path"])
 
     return WorkspaceDetail(
         id=ws["id"],
@@ -120,6 +124,8 @@ async def scan_all_workspaces():
                 ws["id"], len(agents), len(skills), has_md,
                 repo_owner=owner, repo_name=repo,
             )
+            # Sync agents to registry
+            await sync_agents_for_workspace(ws["id"], ws["path"])
             results.append({
                 "id": ws["id"],
                 "name": ws["name"],
@@ -137,3 +143,25 @@ async def scan_all_workspaces():
             })
 
     return {"scanned": len(results), "results": results}
+
+
+@router.get("/{workspace_id}/agents")
+async def list_workspace_agents(workspace_id: str):
+    """List agents from the registry for a workspace."""
+    ws = await repository.get_workspace(workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    agents = await repository.get_agents_for_workspace(workspace_id)
+    return {"agents": agents}
+
+
+@router.get("/{workspace_id}/agents/{agent_name}")
+async def get_workspace_agent(workspace_id: str, agent_name: str):
+    """Get detail of a specific agent from the registry."""
+    ws = await repository.get_workspace(workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    agent = await repository.get_agent_by_name(workspace_id, agent_name)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"agent": agent}

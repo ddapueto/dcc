@@ -37,7 +37,7 @@ class MonitorProcessor:
         parent_id = self._task_stack[-1] if self._task_stack else None
         depth = len(self._task_stack)
 
-        description = self._extract_description(event.tool_name, event.tool_input)
+        metadata = self._extract_task_metadata(event.tool_name, event.tool_input)
         input_summary = self._truncate(event.tool_input, 500)
 
         try:
@@ -46,9 +46,11 @@ class MonitorProcessor:
                 tool_call_id=event.tool_call_id,
                 tool_name=event.tool_name,
                 parent_id=parent_id,
-                description=description,
+                description=metadata["description"],
                 input_summary=input_summary,
                 depth=depth,
+                subagent_type=metadata["subagent_type"],
+                subagent_model=metadata["subagent_model"],
             )
         except Exception:
             logger.exception("Failed to create monitor task")
@@ -65,9 +67,11 @@ class MonitorProcessor:
             "action": "created",
             "task_id": task_id,
             "tool_name": event.tool_name,
-            "description": description,
+            "description": metadata["description"],
             "parent_id": parent_id,
             "depth": depth,
+            "subagent_type": metadata["subagent_type"],
+            "subagent_model": metadata["subagent_model"],
         }
 
     async def _handle_tool_result(self, event: AgUiEvent) -> dict | None:
@@ -137,27 +141,30 @@ class MonitorProcessor:
         return None
 
     @staticmethod
-    def _extract_description(tool_name: str, tool_input: str | None) -> str:
-        """Extrae descripcion legible del tool call."""
+    def _extract_task_metadata(tool_name: str, tool_input: str | None) -> dict:
+        """Extrae description, subagent_type y subagent_model del tool input."""
+        result = {"description": tool_name, "subagent_type": None, "subagent_model": None}
         if not tool_input:
-            return tool_name
+            return result
 
         try:
             parsed = json.loads(tool_input)
         except (json.JSONDecodeError, TypeError):
-            return tool_name
+            return result
 
         if tool_name == "Task":
-            return parsed.get("description", parsed.get("prompt", tool_name))[:200]
+            result["description"] = (
+                parsed.get("description") or parsed.get("prompt") or tool_name
+            )[:200]
+            result["subagent_type"] = parsed.get("subagent_type")
+            result["subagent_model"] = parsed.get("model")
         elif tool_name in ("Read", "Write", "Edit"):
-            return parsed.get("file_path", tool_name)
+            result["description"] = parsed.get("file_path", tool_name)
         elif tool_name == "Bash":
-            cmd = parsed.get("command", "")
-            return cmd[:100] if cmd else tool_name
+            result["description"] = (parsed.get("command") or "")[:100] or tool_name
         elif tool_name in ("Glob", "Grep"):
-            return parsed.get("pattern", tool_name)
-        else:
-            return tool_name
+            result["description"] = parsed.get("pattern", tool_name)
+        return result
 
     @staticmethod
     def _truncate(text: str | None, max_len: int) -> str | None:

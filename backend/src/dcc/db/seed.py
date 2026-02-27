@@ -1,10 +1,13 @@
 import json
+import logging
 from pathlib import Path
 
 from dcc.db import repository
 from dcc.db.database import get_db
 from dcc.engine.workflow_templates import BUILTIN_WORKFLOWS
-from dcc.workspace.scanner import detect_git_repo
+from dcc.workspace.scanner import detect_git_repo, scan_agents
+
+logger = logging.getLogger(__name__)
 
 HOME = Path.home()
 
@@ -174,6 +177,34 @@ async def seed_builtin_workflows() -> None:
     await db.commit()
 
 
+async def sync_agents_for_workspace(workspace_id: str, workspace_path: str) -> None:
+    """Scan agents from filesystem and sync to agent_registry."""
+    try:
+        agents = scan_agents(workspace_path)
+        active_names = []
+        for agent in agents:
+            await repository.upsert_agent(
+                workspace_id=workspace_id,
+                name=agent.name,
+                filename=agent.filename,
+                description=agent.description,
+                model=agent.model,
+                tools=agent.tools,
+                disallowed_tools=agent.disallowed_tools,
+                permission_mode=agent.permission_mode,
+                max_turns=agent.max_turns,
+                skills=agent.skills,
+                memory=agent.memory,
+                background=agent.background,
+                isolation=agent.isolation,
+                system_prompt=agent.system_prompt,
+            )
+            active_names.append(agent.name)
+        await repository.deactivate_missing_agents(workspace_id, active_names)
+    except Exception:
+        logger.exception("Failed to sync agents for workspace %s", workspace_id)
+
+
 async def seed_defaults():
     for t in TENANTS:
         await repository.upsert_tenant(t["id"], t["name"], t["config_dir"], t["claude_alias"])
@@ -186,3 +217,7 @@ async def seed_defaults():
         )
 
     await seed_builtin_workflows()
+
+    # Sync agents for all workspaces
+    for w in WORKSPACES:
+        await sync_agents_for_workspace(w["id"], w["path"])

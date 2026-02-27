@@ -60,6 +60,18 @@
 			>
 				{task.tool_name}
 			</span>
+			{#if task.subagent_type}
+				<span class="rounded bg-purple-500/20 px-1.5 py-0.5 font-medium text-purple-400">
+					@{task.subagent_type}
+				</span>
+			{/if}
+			{#if task.subagent_model}
+				<span
+					class="rounded bg-[var(--color-bg-card)] px-1.5 py-0.5 text-[var(--color-text-muted)]"
+				>
+					model: {task.subagent_model}
+				</span>
+			{/if}
 			{#if task.duration_ms !== null}
 				<span
 					class="flex items-center gap-1 rounded bg-[var(--color-bg-card)] px-1.5 py-0.5 text-[var(--color-text-muted)]"

@@ -118,6 +118,20 @@
 							<span class="text-[11px] font-medium text-[var(--color-text-primary)]">
 								{task.tool_name}
 							</span>
+							{#if task.subagent_type}
+								<span
+									class="rounded bg-purple-500/20 px-1 py-0.5 text-[9px] font-medium text-purple-400"
+								>
+									@{task.subagent_type}
+								</span>
+							{/if}
+							{#if task.subagent_model}
+								<span
+									class="rounded bg-[var(--color-bg-card)] px-1 py-0.5 text-[9px] text-[var(--color-text-muted)]"
+								>
+									{task.subagent_model}
+								</span>
+							{/if}
 							{#if task.duration_ms !== null}
 								<span class="text-[9px] text-[var(--color-text-muted)]">
 									{task.duration_ms < 1000

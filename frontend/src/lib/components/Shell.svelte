@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PanelLeft, Terminal, History, FileCode, Settings, LayoutDashboard, Workflow } from '@lucide/svelte';
+	import { PanelLeft, Terminal, History, FileCode, Settings, LayoutDashboard, Workflow, Bot } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import type { Snippet } from 'svelte';
 
@@ -22,6 +22,7 @@
 		{ href: '/run', label: 'Run', icon: Terminal },
 		{ href: '/history', label: 'History', icon: History },
 		{ href: '/workflows', label: 'Workflows', icon: Workflow },
+		{ href: '/agents', label: 'Agents', icon: Bot },
 		{ href: '/config', label: 'Config', icon: FileCode },
 		{ href: '/manage', label: 'Manage', icon: Settings }
 	];

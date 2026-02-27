@@ -7,10 +7,13 @@
 	import CostBarChart from '$lib/components/dashboard/CostBarChart.svelte';
 	import CostTrendChart from '$lib/components/dashboard/CostTrendChart.svelte';
 	import TopSkillsList from '$lib/components/dashboard/TopSkillsList.svelte';
+	import AgentOverviewCard from '$lib/components/dashboard/AgentOverviewCard.svelte';
 	import { analyticsStore } from '$stores/analytics.svelte';
+	import { agentsStore } from '$stores/agents.svelte';
 
 	onMount(() => {
 		analyticsStore.fetchAll();
+		agentsStore.loadStats();
 	});
 
 	function formatCost(n: number): string {
@@ -87,9 +90,14 @@
 			</div>
 
 			<!-- Row 3: Cost bars + Top skills -->
-			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+			<div class="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<CostBarChart data={analyticsStore.costByWorkspace} />
 				<TopSkillsList data={analyticsStore.topSkills} />
+			</div>
+
+			<!-- Row 4: Top Agents -->
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+				<AgentOverviewCard stats={agentsStore.stats} />
 			</div>
 		</div>
 	{/snippet}
