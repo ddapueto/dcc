@@ -8,6 +8,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from dcc.db import repository
 from dcc.engine.cli_runner import CliRunner
+from dcc.engine.monitor import MonitorProcessor
 from dcc.engine.types import AgUiEventType
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class CreateSessionRequest(BaseModel):
     skill: str | None = None
     agent: str | None = None
     model: str | None = None
+    workflow_id: str | None = None
 
 
 @router.post("")
@@ -39,6 +41,7 @@ async def create_session(req: CreateSessionRequest):
         skill=req.skill,
         agent=req.agent,
         model=req.model,
+        workflow_id=req.workflow_id,
     )
 
     return {"session_id": session_id}
@@ -101,6 +104,8 @@ async def stream_session(session_id: str):
     )
     _active_runners[session_id] = runner
 
+    monitor = MonitorProcessor(session_id)
+
     async def event_generator():
         start_time = time.monotonic()
         event_buffer: list[tuple[str, int, str, str]] = []
@@ -113,6 +118,9 @@ async def stream_session(session_id: str):
                 # Buffer event for persistence
                 event_buffer.append((session_id, seq, event.type.value, data))
                 seq += 1
+
+                # Forward al monitor para construir arbol de ejecucion
+                asyncio.create_task(monitor.process_event(event))
 
                 # Update DB on finish
                 if event.type in (AgUiEventType.RUN_FINISHED, AgUiEventType.RUN_ERROR):
@@ -188,3 +196,14 @@ async def list_sessions(workspace_id: str | None = None, limit: int = 50):
     """List recent sessions, optionally filtered by workspace."""
     sessions = await repository.get_sessions(workspace_id=workspace_id, limit=limit)
     return {"sessions": sessions}
+
+
+@router.get("/{session_id}/monitor")
+async def get_monitor_tasks(session_id: str):
+    """Get monitor tasks (tool call tree) for a session."""
+    session = await repository.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    tasks = await repository.get_monitor_tasks(session_id)
+    return {"tasks": tasks}

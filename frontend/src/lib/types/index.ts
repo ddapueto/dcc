@@ -237,71 +237,52 @@ export interface McpServer {
 	source: 'workspace' | 'global';
 }
 
-// --- Pipelines ---
+// --- Workflows ---
 
-export type PipelineStatus = 'draft' | 'ready' | 'running' | 'paused' | 'completed' | 'failed';
-export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+export type WorkflowCategory = 'development' | 'testing' | 'review' | 'devops' | 'custom';
 
-export interface Pipeline {
+export interface WorkflowParam {
+	key: string;
+	label: string;
+	type: 'text' | 'textarea' | 'number' | 'select';
+	required: boolean;
+	default?: string;
+	options?: string[];
+}
+
+export interface Workflow {
 	id: string;
 	workspace_id: string;
 	name: string;
 	description: string | null;
-	spec: string | null;
-	status: PipelineStatus;
-	source_type: string | null;
-	source_ref: string | null;
-	total_cost: number;
-	total_duration_ms: number;
-	created_at: string;
-	started_at: string | null;
-	finished_at: string | null;
-}
-
-export interface PipelineStep {
-	id: string;
-	pipeline_id: string;
-	position: number;
-	name: string;
-	description: string | null;
-	agent: string | null;
-	skill: string | null;
+	category: WorkflowCategory;
+	icon: string;
+	prompt_template: string;
+	parameters: WorkflowParam[];
 	model: string | null;
-	prompt_template: string | null;
-	status: StepStatus;
-	session_id: string | null;
-	output_summary: string | null;
-	depends_on: string[];
+	is_builtin: boolean;
+	usage_count: number;
+	last_used_at: string | null;
 	created_at: string;
-	started_at: string | null;
-	finished_at: string | null;
 }
 
-export interface AgentRouteInfo {
-	name: string;
-	keywords: string[];
-}
+// --- Monitor ---
 
-export type PipelineEventType =
-	| 'PipelineStarted'
-	| 'PipelineStepStarted'
-	| 'PipelineStepCompleted'
-	| 'PipelineStepFailed'
-	| 'PipelineCompleted'
-	| 'PipelineFailed';
+export type MonitorTaskStatus = 'running' | 'completed' | 'failed';
 
-export interface PipelineEvent {
-	type: PipelineEventType;
+export interface MonitorTask {
+	id: string;
 	session_id: string;
-	pipeline_id?: string;
-	step_id?: string;
-	step_name?: string;
-	step_position?: number;
-	step_agent?: string;
-	step_status?: string;
-	steps_completed?: number;
-	steps_total?: number;
-	cost_usd?: number;
-	duration_ms?: number;
-	error?: string;
+	parent_id: string | null;
+	tool_call_id: string | null;
+	tool_name: string;
+	description: string | null;
+	status: MonitorTaskStatus;
+	input_summary: string | null;
+	output_summary: string | null;
+	depth: number;
+	started_at: string;
+	finished_at: string | null;
+	duration_ms: number | null;
+	children?: MonitorTask[];
 }

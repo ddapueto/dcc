@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–5 complete.
+DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claude Code CLI visually. Phases 1–6 complete.
 
 ## Tech Stack
 
@@ -17,11 +17,11 @@ DCC (Dev Command Center) is a personal multi-tenant dashboard for managing Claud
 dcc/
   backend/
     src/dcc/
-      api/routes/        # REST + SSE + analytics + GitHub proxy + pipeline endpoints
+      api/routes/        # REST + SSE + analytics + GitHub proxy + workflows endpoints
       db/                # SQLite: models, database, repository, seed
-      engine/            # CLI runner, stream parser, event converter, gh client, git diff, pipeline executor, agent router, plan builder
+      engine/            # CLI runner, stream parser, event converter, gh client, git diff, monitor processor, workflow templates
       workspace/         # Scanner for .claude/ directories, git detection, MCP scanner
-    tests/               # pytest tests (105 tests)
+    tests/               # pytest tests (102 tests)
   frontend/
     src/
       lib/
@@ -29,15 +29,15 @@ dcc/
         components/      # Svelte 5 components
           dashboard/     # Analytics charts (StatCard, StatusDonut, CostBarChart, CostTrendChart, TopSkillsList)
         services/        # API + SSE clients
-        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics, github, pipelines)
+        stores/          # Svelte 5 rune-based stores (tabs, workspaces, history, toasts, analytics, github, workflows, monitor)
         types/           # TypeScript interfaces
       routes/            # SvelteKit pages
         dashboard/       # Analytics dashboard
-        run/             # CLI runner with tabs
+        run/             # CLI runner with tabs + monitor panel
         history/         # Session history + replay
         config/          # CLAUDE.md / rules / settings viewer
         manage/          # CRUD workspaces / tenants
-        pipelines/       # Pipeline list, detail (DAG view), creation wizard
+        workflows/       # Workflow gallery, detail, custom editor
   docs/                  # Technical docs
 ```
 
@@ -55,7 +55,7 @@ dcc/
 ```bash
 # Backend
 cd backend && make dev      # Run FastAPI dev server (:8000)
-cd backend && make test     # Run tests (105 tests)
+cd backend && make test     # Run tests (102 tests)
 cd backend && make lint     # Run ruff check + mypy
 
 # Frontend
@@ -87,14 +87,22 @@ cd frontend && npx svelte-check  # Type check
 - GitHubPanel: collapsible sections (issues/PRs/milestones) in /run sidebar, click issue pre-fills prompt with `Issue #N: title\n\nbody`
 - Context sharing: "Use as context" button on completed sessions opens new tab with output as prefill
 - ConfigViewer MCPs tab: shows MCP servers with name, command, args, source badge (workspace/global)
-- Schema changes require deleting `dcc.db` to recreate (no migrations) — `session_diffs` table, `repo_owner`/`repo_name` columns on workspaces
-- DB tables: tenants, workspaces, sessions, token_usage, session_events, session_diffs, pipelines, pipeline_steps
-- Pipeline engine: PipelineExecutor runs steps respecting depends_on DAG, parallel execution (max_parallel), SSE streaming of pipeline-level events
-- Pipeline events: PipelineStarted, PipelineStepStarted, PipelineStepCompleted, PipelineStepFailed, PipelineCompleted, PipelineFailed
-- Agent router: keyword-based agent suggestion for pipeline steps (agent_router.py)
-- Plan builder: constructs planner prompts from spec or milestone issues, parses Claude output to steps (plan_builder.py)
-- Pipeline API: CRUD at `/api/pipelines/*`, generate from spec/milestone, execute via SSE, cancel/pause/resume
-- Pipeline steps use depends_on as JSON TEXT array of step IDs (no junction table)
-- Pipeline context passing: {{prev_output}}, {{step.ID.output}}, {{spec}} in prompt templates
-- Pipeline DAG visualization: SVG with topological sort layering, foreignObject for node HTML (PipelineGraph.svelte)
-- Pipeline creation wizard: 3-step flow (Source → Review → Confirm) with From Spec / From Milestone modes
+- Schema changes require deleting `dcc.db` to recreate (no migrations)
+- DB tables: tenants, workspaces, sessions, token_usage, session_events, session_diffs, workflows, monitor_tasks
+- **Workflows**: Prompt templates with `{{key}}` placeholders. Built-in (6 seeded) + custom. Launch creates a session with resolved prompt. DCC does NOT orchestrate — Claude Code handles orchestration natively.
+- Workflow API: CRUD at `/api/workflows/*`, launch endpoint resolves template + creates session
+- Workflow templates: Spec-Driven Development, TDD Flow, Issue to PR, Security Audit, Code Review, Refactor Module
+- WorkflowEditor: form for custom workflows with dynamic parameter editor (add/remove params with key, label, type, required)
+- WorkflowLauncher: dynamic form generated from `workflow.parameters`, prompt preview, model selector
+- **Monitor**: Real-time observer that parses ToolCallStart/End/Result events to build execution tree
+- Monitor nesting: stack-based detection — when Claude uses "Task" tool, children are nested under parent
+- MonitorProcessor (backend): `process_event()` creates/updates monitor_tasks, `_extract_description()` for human-readable summaries
+- MonitorStore (frontend): mirrors backend logic client-side, builds task tree from flat array via parent_id
+- Monitor feeds from session SSE stream (no separate SSE) — `TabSession.handleEvent()` forwards to `monitorStore.processEvent()`
+- MonitorPanel: Timeline (list) + Graph (DAG) views, stats bar (total/running/completed/failed), TaskDetail panel
+- MonitorGraph: SVG DAG with Task nodes (180x80) and tool nodes (140x56), topological sort layout
+- CategoryFilter: horizontal pills for filtering workflows by category
+- `/workflows` page: gallery of WorkflowCards with category filter + workspace filter, launcher modal
+- `/workflows/new`: WorkflowEditor for creating custom workflows
+- `/workflows/[id]`: detail view with launcher + edit toggle for custom workflows
+- `/run` page: tool calls panel has Monitor toggle — shows MonitorPanel when active

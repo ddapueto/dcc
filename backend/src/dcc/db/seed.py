@@ -1,6 +1,9 @@
+import json
 from pathlib import Path
 
 from dcc.db import repository
+from dcc.db.database import get_db
+from dcc.engine.workflow_templates import BUILTIN_WORKFLOWS
 from dcc.workspace.scanner import detect_git_repo
 
 HOME = Path.home()
@@ -128,6 +131,49 @@ WORKSPACES = [
 ]
 
 
+async def seed_builtin_workflows() -> None:
+    """Seed built-in workflows para cada workspace (upsert by name)."""
+    db = await get_db()
+    cursor = await db.execute("SELECT id FROM workspaces")
+    workspace_ids = [row["id"] for row in await cursor.fetchall()]
+
+    for ws_id in workspace_ids:
+        for tmpl in BUILTIN_WORKFLOWS:
+            # Upsert: check si ya existe por name + workspace_id
+            cursor = await db.execute(
+                "SELECT id FROM workflows WHERE workspace_id = ? AND name = ? AND is_builtin = 1",
+                (ws_id, tmpl["name"]),
+            )
+            existing = await cursor.fetchone()
+            if existing:
+                # Actualizar template en caso de cambios
+                await db.execute(
+                    """UPDATE workflows SET prompt_template = ?, description = ?,
+                         category = ?, icon = ?, parameters = ?
+                       WHERE id = ?""",
+                    (
+                        tmpl["prompt_template"],
+                        tmpl.get("description"),
+                        tmpl.get("category", "custom"),
+                        tmpl.get("icon", "Workflow"),
+                        json.dumps(tmpl.get("parameters", [])),
+                        existing["id"],
+                    ),
+                )
+            else:
+                await repository.create_workflow(
+                    workspace_id=ws_id,
+                    name=tmpl["name"],
+                    prompt_template=tmpl["prompt_template"],
+                    description=tmpl.get("description"),
+                    category=tmpl.get("category", "custom"),
+                    icon=tmpl.get("icon", "Workflow"),
+                    parameters=tmpl.get("parameters"),
+                    is_builtin=True,
+                )
+    await db.commit()
+
+
 async def seed_defaults():
     for t in TENANTS:
         await repository.upsert_tenant(t["id"], t["name"], t["config_dir"], t["claude_alias"])
@@ -138,3 +184,5 @@ async def seed_defaults():
             w["id"], w["tenant_id"], w["name"], w["path"],
             repo_owner=owner, repo_name=repo,
         )
+
+    await seed_builtin_workflows()

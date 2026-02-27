@@ -39,13 +39,6 @@ class AgUiEventType(str, Enum):
     TOOL_CALL_RESULT = "ToolCallResult"
     STATE_SNAPSHOT = "StateSnapshot"
     CUSTOM = "Custom"
-    # Pipeline events
-    PIPELINE_STARTED = "PipelineStarted"
-    PIPELINE_STEP_STARTED = "PipelineStepStarted"
-    PIPELINE_STEP_COMPLETED = "PipelineStepCompleted"
-    PIPELINE_STEP_FAILED = "PipelineStepFailed"
-    PIPELINE_COMPLETED = "PipelineCompleted"
-    PIPELINE_FAILED = "PipelineFailed"
 
 
 class AgUiEvent(BaseModel):
@@ -79,12 +72,3 @@ class AgUiEvent(BaseModel):
     # Custom
     custom_type: str | None = None
     data: dict[str, Any] | None = None
-    # Pipeline fields
-    pipeline_id: str | None = None
-    step_id: str | None = None
-    step_name: str | None = None
-    step_position: int | None = None
-    step_agent: str | None = None
-    step_status: str | None = None
-    steps_completed: int | None = None
-    steps_total: int | None = None

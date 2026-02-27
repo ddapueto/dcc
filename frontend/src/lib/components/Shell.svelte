@@ -21,7 +21,7 @@
 		{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
 		{ href: '/run', label: 'Run', icon: Terminal },
 		{ href: '/history', label: 'History', icon: History },
-		{ href: '/pipelines', label: 'Pipelines', icon: Workflow },
+		{ href: '/workflows', label: 'Workflows', icon: Workflow },
 		{ href: '/config', label: 'Config', icon: FileCode },
 		{ href: '/manage', label: 'Manage', icon: Settings }
 	];

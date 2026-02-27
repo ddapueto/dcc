@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     output_tokens INTEGER,
     num_turns INTEGER,
     duration_ms INTEGER,
+    workflow_id TEXT REFERENCES workflows(id),
     started_at TEXT NOT NULL DEFAULT (datetime('now')),
     finished_at TEXT
 );
@@ -73,39 +74,36 @@ CREATE TABLE IF NOT EXISTS session_diffs (
 );
 CREATE INDEX IF NOT EXISTS idx_session_diffs_session ON session_diffs(session_id);
 
-CREATE TABLE IF NOT EXISTS pipelines (
+CREATE TABLE IF NOT EXISTS workflows (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL REFERENCES workspaces(id),
     name TEXT NOT NULL,
     description TEXT,
-    spec TEXT,
-    status TEXT NOT NULL DEFAULT 'draft',
-    source_type TEXT,
-    source_ref TEXT,
-    total_cost REAL DEFAULT 0,
-    total_duration_ms INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    started_at TEXT,
-    finished_at TEXT
+    category TEXT DEFAULT 'custom',
+    icon TEXT DEFAULT 'Workflow',
+    prompt_template TEXT NOT NULL,
+    parameters TEXT DEFAULT '[]',
+    model TEXT,
+    is_builtin INTEGER NOT NULL DEFAULT 0,
+    usage_count INTEGER NOT NULL DEFAULT 0,
+    last_used_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS pipeline_steps (
+CREATE TABLE IF NOT EXISTS monitor_tasks (
     id TEXT PRIMARY KEY,
-    pipeline_id TEXT NOT NULL REFERENCES pipelines(id),
-    position INTEGER NOT NULL DEFAULT 0,
-    name TEXT NOT NULL,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    parent_id TEXT REFERENCES monitor_tasks(id),
+    tool_call_id TEXT,
+    tool_name TEXT NOT NULL,
     description TEXT,
-    agent TEXT,
-    skill TEXT,
-    model TEXT,
-    prompt_template TEXT,
-    status TEXT NOT NULL DEFAULT 'pending',
-    session_id TEXT REFERENCES sessions(id),
+    status TEXT NOT NULL DEFAULT 'running',
+    input_summary TEXT,
     output_summary TEXT,
-    depends_on TEXT DEFAULT '[]',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    started_at TEXT,
-    finished_at TEXT
+    depth INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT,
+    duration_ms INTEGER
 );
-CREATE INDEX IF NOT EXISTS idx_pipeline_steps_pipeline ON pipeline_steps(pipeline_id);
+CREATE INDEX IF NOT EXISTS idx_monitor_tasks_session ON monitor_tasks(session_id);
 """

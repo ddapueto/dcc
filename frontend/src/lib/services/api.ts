@@ -16,9 +16,8 @@ import type {
 	GitHubPR,
 	SessionDiff,
 	McpServer,
-	Pipeline,
-	PipelineStep,
-	AgentRouteInfo
+	Workflow,
+	MonitorTask
 } from '$types/index';
 
 const BASE = '/api';
@@ -239,123 +238,76 @@ export async function fetchMcps(
 	return request(`/config/${workspaceId}/mcps`);
 }
 
-// --- Pipelines ---
+// --- Workflows ---
 
-export async function fetchPipelines(
+export async function fetchWorkflows(
 	workspaceId?: string,
-	limit: number = 50
-): Promise<{ pipelines: Pipeline[] }> {
+	category?: string
+): Promise<{ workflows: Workflow[] }> {
 	const qs = new URLSearchParams();
 	if (workspaceId) qs.set('workspace_id', workspaceId);
-	qs.set('limit', String(limit));
-	return request(`/pipelines?${qs}`);
+	if (category) qs.set('category', category);
+	return request(`/workflows?${qs}`);
 }
 
-export async function fetchPipeline(
-	id: string
-): Promise<{ pipeline: Pipeline; steps: PipelineStep[] }> {
-	return request(`/pipelines/${id}`);
+export async function fetchWorkflow(id: string): Promise<{ workflow: Workflow }> {
+	return request(`/workflows/${id}`);
 }
 
-export async function createPipeline(params: {
+export async function createWorkflow(params: {
 	workspace_id: string;
 	name: string;
+	prompt_template: string;
 	description?: string;
-	spec?: string;
-	source_type?: string;
-	source_ref?: string;
-}): Promise<{ pipeline_id: string }> {
-	return request('/pipelines', {
+	category?: string;
+	icon?: string;
+	parameters?: Array<Record<string, unknown>>;
+	model?: string;
+}): Promise<{ workflow_id: string }> {
+	return request('/workflows', {
 		method: 'POST',
 		body: JSON.stringify(params)
 	});
 }
 
-export async function generatePipeline(params: {
-	workspace_id: string;
-	name: string;
-	description?: string;
-	spec?: string;
-	milestone_number?: number;
-}): Promise<{ pipeline: Pipeline; steps: PipelineStep[] }> {
-	return request('/pipelines/generate', {
-		method: 'POST',
-		body: JSON.stringify(params)
-	});
-}
-
-export async function deletePipeline(id: string): Promise<{ deleted: boolean }> {
-	return request(`/pipelines/${id}`, { method: 'DELETE' });
-}
-
-export async function updatePipelineStatus(
+export async function updateWorkflow(
 	id: string,
-	status: string
-): Promise<{ status: string }> {
-	return request(`/pipelines/${id}/status`, {
-		method: 'PATCH',
-		body: JSON.stringify({ status })
-	});
-}
-
-export async function addPipelineStep(
-	pipelineId: string,
-	step: {
-		position: number;
-		name: string;
-		description?: string;
-		agent?: string;
-		skill?: string;
-		model?: string;
-		prompt_template?: string;
-		depends_on?: string[];
-	}
-): Promise<{ step_id: string; suggested_agent: string | null }> {
-	return request(`/pipelines/${pipelineId}/steps`, {
-		method: 'POST',
-		body: JSON.stringify(step)
-	});
-}
-
-export async function updatePipelineStep(
-	pipelineId: string,
-	stepId: string,
 	updates: Partial<{
 		name: string;
 		description: string;
-		agent: string;
-		skill: string;
-		model: string;
+		category: string;
+		icon: string;
 		prompt_template: string;
-		position: number;
-		depends_on: string[];
+		parameters: Array<Record<string, unknown>>;
+		model: string;
 	}>
 ): Promise<{ updated: boolean }> {
-	return request(`/pipelines/${pipelineId}/steps/${stepId}`, {
-		method: 'PATCH',
+	return request(`/workflows/${id}`, {
+		method: 'PUT',
 		body: JSON.stringify(updates)
 	});
 }
 
-export async function deletePipelineStep(
-	pipelineId: string,
-	stepId: string
-): Promise<{ deleted: boolean }> {
-	return request(`/pipelines/${pipelineId}/steps/${stepId}`, { method: 'DELETE' });
+export async function deleteWorkflow(id: string): Promise<{ deleted: boolean }> {
+	return request(`/workflows/${id}`, { method: 'DELETE' });
 }
 
-export async function cancelPipeline(id: string): Promise<void> {
-	await request(`/pipelines/${id}/cancel`, { method: 'POST' });
+export async function launchWorkflow(
+	id: string,
+	workspaceId: string,
+	params: Record<string, string>,
+	model?: string
+): Promise<{ session_id: string; redirect: string }> {
+	return request(`/workflows/${id}/launch`, {
+		method: 'POST',
+		body: JSON.stringify({ workspace_id: workspaceId, params, model })
+	});
 }
 
-export async function pausePipeline(id: string): Promise<void> {
-	await request(`/pipelines/${id}/pause`, { method: 'POST' });
-}
+// --- Monitor ---
 
-export async function resumePipeline(id: string): Promise<void> {
-	await request(`/pipelines/${id}/resume`, { method: 'POST' });
-}
-
-export async function fetchAvailableAgents(): Promise<{ agents: AgentRouteInfo[] }> {
-	return request('/pipelines/agents');
+export async function fetchMonitorTasks(
+	sessionId: string
+): Promise<{ tasks: MonitorTask[] }> {
+	return request(`/sessions/${sessionId}/monitor`);
 }

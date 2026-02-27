@@ -1,6 +1,7 @@
 import type { AgUiEvent, ToolCall } from '$types/index';
 import { createSession, cancelSession } from '$services/api';
 import { connectSession } from '$services/sse';
+import { monitorStore } from './monitor.svelte';
 import { toastStore } from './toasts.svelte';
 
 export class TabSession {
@@ -133,6 +134,9 @@ export class TabSession {
 				this._notifyIfBackground('error');
 				break;
 		}
+
+		// Forward al monitor para construir arbol de ejecucion
+		monitorStore.processEvent(event);
 	}
 
 	async cancel() {

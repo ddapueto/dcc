@@ -12,8 +12,12 @@
 	import { workspacesStore } from '$stores/workspaces.svelte';
 	import { tabsStore } from '$stores/tabs.svelte';
 	import { githubStore } from '$stores/github.svelte';
+	import MonitorPanel from '$lib/components/MonitorPanel.svelte';
+	import { monitorStore } from '$stores/monitor.svelte';
 	import { initGlobalShortcuts } from '$lib/actions/shortcuts';
 	import type { SkillInfo, AgentInfo, GitHubIssue } from '$types/index';
+
+	let monitorMode = $state(false);
 
 	let selectedSkill = $state<string | null>(null);
 	let selectedAgent = $state<string | null>(null);
@@ -153,19 +157,37 @@
 						</div>
 					</div>
 
-					<!-- Tool calls panel -->
-					{#if currentSession.toolCalls.length > 0}
+					<!-- Tool calls / Monitor panel -->
+					{#if currentSession.toolCalls.length > 0 || monitorStore.tasks.length > 0}
 						<div
-							class="w-80 shrink-0 overflow-y-auto border-l border-[var(--color-border)] p-3"
+							class="flex w-80 shrink-0 flex-col border-l border-[var(--color-border)]"
 						>
-							<div class="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-								Tool Calls ({currentSession.toolCalls.length})
+							<div class="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-2">
+								<span class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+									{monitorMode ? 'Monitor' : `Tool Calls (${currentSession.toolCalls.length})`}
+								</span>
+								<button
+									class="rounded px-2 py-0.5 text-[10px] transition-colors {monitorMode
+										? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+										: 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'}"
+									onclick={() => (monitorMode = !monitorMode)}
+									title="Toggle monitor view"
+								>
+									{monitorMode ? 'Tools' : 'Monitor'}
+								</button>
 							</div>
-							<div class="flex flex-col gap-2">
-								{#each currentSession.toolCalls as tc (tc.id)}
-									<ToolCallCard toolCall={tc} />
-								{/each}
-							</div>
+
+							{#if monitorMode}
+								<MonitorPanel sessionId={currentSession.sessionId} />
+							{:else}
+								<div class="flex-1 overflow-y-auto p-3">
+									<div class="flex flex-col gap-2">
+										{#each currentSession.toolCalls as tc (tc.id)}
+											<ToolCallCard toolCall={tc} />
+										{/each}
+									</div>
+								</div>
+							{/if}
 						</div>
 					{/if}
 				</div>
