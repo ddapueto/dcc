@@ -93,7 +93,12 @@
 		{/if}
 
 		<div class="flex-1 overflow-y-auto p-3">
-			{#if task.output_summary && (task.status === 'completed' || task.status === 'failed')}
+			{#if task.status === 'failed' && task.output_summary}
+				<p class="mb-1 text-[10px] font-medium text-red-400">Error</p>
+				<pre
+					class="overflow-auto rounded border border-red-500/20 bg-red-500/5 p-2 text-[11px] text-red-300"
+				>{task.output_summary}</pre>
+			{:else if task.output_summary && task.status === 'completed'}
 				<p class="mb-1 text-[10px] font-medium text-[var(--color-text-muted)]">Output</p>
 				<div class="prose-sm">
 					<MarkdownRenderer content={task.output_summary} />

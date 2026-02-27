@@ -89,6 +89,7 @@ async def create_workflow(req: CreateWorkflowRequest):
     return {"workflow_id": workflow_id}
 
 
+# IMPORTANT: /categories MUST be before /{workflow_id} to avoid path matching conflict
 @router.get("/categories")
 async def list_categories():
     """Listar categorias de workflows."""

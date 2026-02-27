@@ -158,7 +158,7 @@
 					</div>
 
 					<!-- Tool calls / Monitor panel -->
-					{#if currentSession.toolCalls.length > 0 || monitorStore.tasks.length > 0}
+					{#if currentSession.status !== 'idle'}
 						<div
 							class="flex w-80 shrink-0 flex-col border-l border-[var(--color-border)]"
 						>
@@ -181,11 +181,17 @@
 								<MonitorPanel sessionId={currentSession.sessionId} />
 							{:else}
 								<div class="flex-1 overflow-y-auto p-3">
-									<div class="flex flex-col gap-2">
-										{#each currentSession.toolCalls as tc (tc.id)}
-											<ToolCallCard toolCall={tc} />
-										{/each}
-									</div>
+									{#if currentSession.toolCalls.length === 0}
+										<p class="py-8 text-center text-xs text-[var(--color-text-muted)]">
+											Tool calls will appear here...
+										</p>
+									{:else}
+										<div class="flex flex-col gap-2">
+											{#each currentSession.toolCalls as tc (tc.id)}
+												<ToolCallCard toolCall={tc} />
+											{/each}
+										</div>
+									{/if}
 								</div>
 							{/if}
 						</div>

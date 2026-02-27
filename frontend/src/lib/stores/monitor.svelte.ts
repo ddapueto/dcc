@@ -1,9 +1,11 @@
 import type { AgUiEvent, MonitorTask, MonitorTaskStatus } from '$types/index';
+import { fetchMonitorTasks } from '$services/api';
 
 class MonitorStore {
 	tasks = $state<MonitorTask[]>([]);
 	selectedTaskId = $state<string | null>(null);
 	active = $state(false);
+	loading = $state(false);
 
 	selectedTask = $derived(this.tasks.find((t) => t.id === this.selectedTaskId) ?? null);
 	rootTasks = $derived(this.tasks.filter((t) => !t.parent_id));
@@ -31,10 +33,27 @@ class MonitorStore {
 	reset() {
 		this.tasks = [];
 		this.selectedTaskId = null;
+		this.loading = false;
 		this._taskStack = [];
 		this._toolToTask.clear();
 		this._taskStartTimes.clear();
 		this._idCounter = 0;
+	}
+
+	/** Cargar monitor tasks historicas desde backend (para sesiones ya completadas o reload). */
+	async loadFromSession(sessionId: string) {
+		if (this.tasks.length > 0) return; // Ya tiene datos live
+		this.loading = true;
+		try {
+			const data = await fetchMonitorTasks(sessionId);
+			if (data.tasks.length > 0) {
+				this.tasks = data.tasks;
+			}
+		} catch {
+			// Monitor data not available — not critical
+		} finally {
+			this.loading = false;
+		}
 	}
 
 	private _handleToolStart(event: AgUiEvent) {

@@ -8,6 +8,7 @@
 	import { workflowStore } from '$stores/workflows.svelte';
 	import { workspacesStore } from '$stores/workspaces.svelte';
 	import { tabsStore } from '$stores/tabs.svelte';
+	import { toastStore } from '$stores/toasts.svelte';
 	import { Workflow, Edit3 } from '@lucide/svelte';
 
 	let editing = $state(false);
@@ -21,26 +22,37 @@
 	});
 
 	async function handleLaunch(params: Record<string, string>, model?: string) {
-		if (!workflowStore.current || !workspacesStore.currentWorkspaceId) return;
+		if (!workflowStore.current) return;
+
+		const wsId = workflowStore.current.workspace_id || workspacesStore.currentWorkspaceId;
+		if (!wsId) {
+			toastStore.add('No workspace selected', 'error');
+			return;
+		}
 
 		try {
 			const sessionId = await workflowStore.launch(
 				workflowStore.current.id,
-				workspacesStore.currentWorkspaceId,
+				wsId,
 				params,
 				model
 			);
 			tabsStore.addTab(workflowStore.current.name);
 			goto('/run');
 		} catch (e) {
-			console.error('Failed to launch workflow:', e);
+			toastStore.add('Failed to launch workflow', 'error');
 		}
 	}
 
 	async function handleSave(data: Record<string, unknown>) {
 		if (!workflowStore.current) return;
-		await workflowStore.update(workflowStore.current.id, data);
-		editing = false;
+		try {
+			await workflowStore.update(workflowStore.current.id, data);
+			editing = false;
+			toastStore.add('Workflow updated', 'success');
+		} catch (e) {
+			toastStore.add('Failed to update workflow', 'error');
+		}
 	}
 </script>
 

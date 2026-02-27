@@ -26,6 +26,7 @@ export class TabSession {
 
 	async start(workspaceId: string, prompt: string, skill?: string, agent?: string, model?: string) {
 		this.reset();
+		monitorStore.reset();
 		this.status = 'running';
 
 		try {

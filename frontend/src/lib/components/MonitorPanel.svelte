@@ -13,6 +13,13 @@
 
 	let viewMode = $state<'graph' | 'timeline'>('timeline');
 
+	// Cargar datos historicos si no hay datos live
+	$effect(() => {
+		if (sessionId && monitorStore.tasks.length === 0 && !monitorStore.loading) {
+			monitorStore.loadFromSession(sessionId);
+		}
+	});
+
 	function selectTask(task: MonitorTask) {
 		monitorStore.selectedTaskId = task.id;
 	}

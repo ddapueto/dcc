@@ -8,12 +8,14 @@
 	import { workflowStore } from '$stores/workflows.svelte';
 	import { workspacesStore } from '$stores/workspaces.svelte';
 	import { tabsStore } from '$stores/tabs.svelte';
+	import { toastStore } from '$stores/toasts.svelte';
 	import { Plus, Workflow, X } from '@lucide/svelte';
 	import type { Workflow as WorkflowType } from '$types/index';
 
 	let filterWorkspaceId = $state<string>('');
 	let selectedCategory = $state<string | null>(null);
 	let launcherWorkflow = $state<WorkflowType | null>(null);
+	let initialLoadDone = $state(false);
 
 	const categories = [
 		{ id: 'development', label: 'Development' },
@@ -25,7 +27,20 @@
 
 	onMount(() => {
 		workspacesStore.fetch();
-		workflowStore.loadWorkflows();
+	});
+
+	// Auto-seleccionar workspace actual y cargar workflows filtrados
+	$effect(() => {
+		if (initialLoadDone) return;
+		const wsId = workspacesStore.currentWorkspaceId;
+		const workspaces = workspacesStore.workspaces;
+		if (workspaces.length === 0) return;
+
+		// Usar workspace actual o el primero disponible
+		const targetId = wsId || workspaces[0].id;
+		filterWorkspaceId = targetId;
+		workflowStore.loadWorkflows(targetId);
+		initialLoadDone = true;
 	});
 
 	function handleFilter() {
@@ -45,17 +60,29 @@
 	}
 
 	async function handleDelete(wf: WorkflowType) {
-		await workflowStore.remove(wf.id);
+		try {
+			await workflowStore.remove(wf.id);
+			toastStore.add(`Workflow "${wf.name}" deleted`, 'success');
+		} catch (e) {
+			toastStore.add('Failed to delete workflow', 'error');
+		}
 	}
 
 	async function handleLaunch(params: Record<string, string>, model?: string) {
-		if (!launcherWorkflow || !workspacesStore.currentWorkspaceId) return;
+		if (!launcherWorkflow) return;
+
+		// Usar workspace del workflow o el actual
+		const wsId = launcherWorkflow.workspace_id || workspacesStore.currentWorkspaceId;
+		if (!wsId) {
+			toastStore.add('No workspace selected', 'error');
+			return;
+		}
 
 		const wfName = launcherWorkflow.name;
 		try {
 			const sessionId = await workflowStore.launch(
 				launcherWorkflow.id,
-				workspacesStore.currentWorkspaceId,
+				wsId,
 				params,
 				model
 			);
@@ -63,7 +90,7 @@
 			tabsStore.addTab(wfName);
 			goto('/run');
 		} catch (e) {
-			console.error('Failed to launch workflow:', e);
+			toastStore.add('Failed to launch workflow', 'error');
 		}
 	}
 </script>
